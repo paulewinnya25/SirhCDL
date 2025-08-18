@@ -1,0 +1,218 @@
+.message-box {
+    position: fixed;
+    bottom: 20px;
+    right: -350px;
+    width: 350px;
+    background-color: var(--white);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    transition: var(--transition-base);
+    z-index: 1040;
+    overflow: hidden;
+  }
+  
+  .message-box.show {
+    right: 20px;
+  }
+  
+  .message-header {
+    background: var(--gradient-primary);
+    color: var(--white);
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .message-title {
+    font-weight: 600;
+    font-size: 1rem;
+    margin: 0;
+  }
+  
+  .message-close {
+    background: none;
+    border: none;
+    color: var(--white);
+    cursor: pointer;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+  }
+  
+  .message-refresh {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    margin-right: 10px;
+    transition: transform 0.3s ease;
+  }
+  
+  .message-refresh:hover {
+    transform: rotate(180deg);
+  }
+  
+  .message-body {
+    height: 250px;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  
+  .message-empty {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--gray);
+  }
+  
+  .message-empty-icon {
+    font-size: 3rem;
+    color: #d1d7e0;
+    margin-bottom: 10px;
+  }
+  
+  .message-form {
+    padding: 15px;
+    border-top: 1px solid rgba(0,0,0,0.05);
+  }
+  
+  .message-select {
+    margin-bottom: 10px;
+  }
+  
+  .message-input-group {
+    display: flex;
+    gap: 10px;
+  }
+  
+  .message-input {
+    flex: 1;
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 20px;
+    padding: 8px 15px;
+    font-size: 0.875rem;
+  }
+  
+  .message-input:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  
+  .message-send {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    color: var(--white);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition-base);
+  }
+  
+  .message-send:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  }
+  
+  .message-send.w-100 {
+    width: 100%;
+    border-radius: 20px;
+    height: auto;
+    padding: 8px;
+  }
+  
+  .email-list {
+    max-height: 250px;
+    overflow-y: auto;
+  }
+  
+  .email-item {
+    cursor: pointer;
+    transition: background-color 0.2s;
+    padding: 10px;
+  }
+  
+  .email-item:hover {
+    background-color: rgba(58, 123, 213, 0.05);
+  }
+  
+  .email-sender {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  
+  .email-subject {
+    font-size: 0.85rem;
+  }
+  
+  .email-snippet {
+    color: var(--gray);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .nav-tabs {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 0 15px;
+  }
+  
+  .nav-tabs .nav-link {
+    border: none;
+    color: var(--secondary);
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    margin-right: 0.5rem;
+    border-radius: 0;
+    transition: var(--transition-base);
+    cursor: pointer;
+  }
+  
+  .nav-tabs .nav-link:hover {
+    color: var(--primary);
+    background-color: transparent;
+    border-bottom: 2px solid rgba(58, 123, 213, 0.3);
+  }
+  
+  .nav-tabs .nav-link.active {
+    color: var(--primary);
+    font-weight: 600;
+    background-color: transparent;
+    border-bottom: 2px solid var(--primary);
+  }
+  
+  .tab-content {
+    padding-top: 10px;
+  }
+  
+  .email-label {
+    color: var(--gray);
+    margin-right: 5px;
+  }
+  
+  .email-recipient {
+    color: var(--dark);
+  }
+  
+  .tab-pane .email-list {
+    max-height: 210px;
+  }
+  
+  .tab-pane {
+    display: none;
+  }
+  
+  .tab-pane.show.active {
+    display: block;
+  }

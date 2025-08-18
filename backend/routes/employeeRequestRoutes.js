@@ -1,0 +1,309 @@
+const express = require('express');
+
+module.exports = (pool) => {
+    const router = express.Router();
+
+    // Récupérer toutes les demandes
+    router.get('/', async (req, res) => {
+        try {
+            const query = `
+                SELECT er.*, e.nom_prenom, e.poste_actuel, e.entity, e.email 
+                FROM employee_requests er
+                LEFT JOIN employees e ON er.employee_id = e.id
+                ORDER BY er.request_date DESC
+            `;
+            const result = await pool.query(query);
+            res.json(result.rows);
+        } catch (err) {
+            console.error('Error fetching employee requests:', err);
+            res.status(500).json({ error: 'Failed to fetch employee requests', details: err.message });
+        }
+    });
+
+    // Récupérer les demandes d'un employé spécifique
+    router.get('/employee/:employeeId', async (req, res) => {
+        try {
+            const { employeeId } = req.params;
+            const query = `
+                SELECT er.*, e.nom_prenom, e.poste_actuel, e.entity, e.email 
+                FROM employee_requests er
+                LEFT JOIN employees e ON er.employee_id = e.id
+                WHERE er.employee_id = $1
+                ORDER BY er.request_date DESC
+            `;
+            const result = await pool.query(query, [employeeId]);
+            res.json(result.rows);
+        } catch (err) {
+            console.error('Error fetching employee requests:', err);
+            res.status(500).json({ error: 'Failed to fetch employee requests', details: err.message });
+        }
+    });
+
+    // Récupérer une demande par son ID
+    router.get('/:id', async (req, res) => {
+        try {
+            const { id } = req.params;
+            const query = `
+                SELECT er.*, e.nom_prenom, e.poste_actuel, e.entity, e.email 
+                FROM employee_requests er
+                LEFT JOIN employees e ON er.employee_id = e.id
+                WHERE er.id = $1
+            `;
+            const result = await pool.query(query, [id]);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'Employee request not found' });
+            }
+            
+            res.json(result.rows[0]);
+        } catch (err) {
+            console.error('Error fetching employee request:', err);
+            res.status(500).json({ error: 'Failed to fetch employee request', details: err.message });
+        }
+    });
+
+    // Créer une nouvelle demande
+    router.post('/', async (req, res) => {
+        try {
+            const { 
+                employee_id, 
+                request_type, 
+                request_details, 
+                start_date, 
+                end_date, 
+                reason,
+                start_time,
+                end_time
+            } = req.body;
+
+            const query = `
+                INSERT INTO employee_requests 
+                (employee_id, request_type, request_details, start_date, end_date, reason, status, request_date, start_time, end_time) 
+                VALUES ($1, $2, $3, $4, $5, $6, 'pending', CURRENT_TIMESTAMP, $7, $8) 
+                RETURNING *
+            `;
+
+            const values = [
+                employee_id,
+                request_type,
+                request_details,
+                start_date,
+                end_date,
+                reason,
+                start_time,
+                end_time
+            ];
+
+            const result = await pool.query(query, values);
+            
+            // Récupérer les informations de l'employé pour la réponse
+            const employeeQuery = `SELECT nom_prenom, poste_actuel, entity, email FROM employees WHERE id = $1`;
+            const employeeResult = await pool.query(employeeQuery, [employee_id]);
+            
+            // Combiner les résultats
+            const response = {
+                ...result.rows[0],
+                ...(employeeResult.rows[0] || {})
+            };
+            
+            res.status(201).json(response);
+        } catch (err) {
+            console.error('Error creating employee request:', err);
+            res.status(500).json({ error: 'Failed to create employee request', details: err.message });
+        }
+    });
+
+    // Approuver une demande
+    router.put('/:id/approve', async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { response_comments } = req.body;
+
+            const query = `
+                UPDATE employee_requests 
+                SET status = 'approved', 
+                    response_date = CURRENT_TIMESTAMP, 
+                    response_comments = $1 
+                WHERE id = $2 
+                RETURNING *
+            `;
+
+            const result = await pool.query(query, [response_comments, id]);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'Employee request not found' });
+            }
+
+            // Récupérer les informations de l'employé pour la réponse
+            const employeeQuery = `
+                SELECT e.nom_prenom, e.poste_actuel, e.entity, e.email 
+                FROM employees e
+                JOIN employee_requests er ON e.id = er.employee_id
+                WHERE er.id = $1
+            `;
+            const employeeResult = await pool.query(employeeQuery, [id]);
+            
+            // Combiner les résultats
+            const response = {
+                ...result.rows[0],
+                ...(employeeResult.rows[0] || {})
+            };
+            
+            res.json(response);
+        } catch (err) {
+            console.error('Error approving employee request:', err);
+            res.status(500).json({ error: 'Failed to approve employee request', details: err.message });
+        }
+    });
+
+    // Refuser une demande
+    router.put('/:id/reject', async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { response_comments } = req.body;
+
+            // Vérifier que les commentaires de rejet sont fournis
+            if (!response_comments) {
+                return res.status(400).json({ error: 'Rejection comments are required' });
+            }
+
+            const query = `
+                UPDATE employee_requests 
+                SET status = 'rejected', 
+                    response_date = CURRENT_TIMESTAMP, 
+                    response_comments = $1 
+                WHERE id = $2 
+                RETURNING *
+            `;
+
+            const result = await pool.query(query, [response_comments, id]);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'Employee request not found' });
+            }
+
+            // Récupérer les informations de l'employé pour la réponse
+            const employeeQuery = `
+                SELECT e.nom_prenom, e.poste_actuel, e.entity, e.email 
+                FROM employees e
+                JOIN employee_requests er ON e.id = er.employee_id
+                WHERE er.id = $1
+            `;
+            const employeeResult = await pool.query(employeeQuery, [id]);
+            
+            // Combiner les résultats
+            const response = {
+                ...result.rows[0],
+                ...(employeeResult.rows[0] || {})
+            };
+            
+            res.json(response);
+        } catch (err) {
+            console.error('Error rejecting employee request:', err);
+            res.status(500).json({ error: 'Failed to reject employee request', details: err.message });
+        }
+    });
+
+    // Supprimer une demande
+    router.delete('/:id', async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            const query = 'DELETE FROM employee_requests WHERE id = $1 RETURNING *';
+            const result = await pool.query(query, [id]);
+
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'Employee request not found' });
+            }
+
+            res.json({ message: 'Employee request deleted successfully', request: result.rows[0] });
+        } catch (err) {
+            console.error('Error deleting employee request:', err);
+            res.status(500).json({ error: 'Failed to delete employee request', details: err.message });
+        }
+    });
+
+    // Recherche avec filtres
+    router.get('/search/filter', async (req, res) => {
+        try {
+            const { status, type, employee, startDate, endDate } = req.query;
+            
+            let conditions = [];
+            let params = [];
+            let paramIndex = 1;
+            
+            if (status) {
+                conditions.push(`er.status = $${paramIndex}`);
+                params.push(status);
+                paramIndex++;
+            }
+            
+            if (type) {
+                conditions.push(`er.request_type = $${paramIndex}`);
+                params.push(type);
+                paramIndex++;
+            }
+            
+            if (employee) {
+                conditions.push(`e.nom_prenom ILIKE $${paramIndex}`);
+                params.push(`%${employee}%`);
+                paramIndex++;
+            }
+            
+            if (startDate) {
+                conditions.push(`er.request_date >= $${paramIndex}`);
+                params.push(startDate);
+                paramIndex++;
+            }
+            
+            if (endDate) {
+                conditions.push(`er.request_date <= $${paramIndex}`);
+                params.push(endDate);
+                paramIndex++;
+            }
+            
+            let query = `
+                SELECT er.*, e.nom_prenom, e.poste_actuel, e.entity, e.email 
+                FROM employee_requests er
+                LEFT JOIN employees e ON er.employee_id = e.id
+            `;
+            
+            if (conditions.length > 0) {
+                query += ` WHERE ${conditions.join(' AND ')}`;
+            }
+            
+            query += ` ORDER BY er.request_date DESC`;
+            
+            const result = await pool.query(query, params);
+            res.json(result.rows);
+        } catch (err) {
+            console.error('Error searching employee requests:', err);
+            res.status(500).json({ error: 'Failed to search employee requests', details: err.message });
+        }
+    });
+
+    // Obtenir des statistiques sur les demandes
+    router.get('/stats/overview', async (req, res) => {
+        try {
+            const query = `
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+                    COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
+                    COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected,
+                    COUNT(CASE WHEN request_type = 'leave' THEN 1 END) as leaves,
+                    COUNT(CASE WHEN request_type = 'absence' THEN 1 END) as absences,
+                    COUNT(CASE WHEN request_type = 'document' THEN 1 END) as documents
+                FROM employee_requests
+            `;
+            
+            const result = await pool.query(query);
+            res.json(result.rows[0]);
+        } catch (err) {
+            console.error('Error fetching employee request statistics:', err);
+            res.status(500).json({ error: 'Failed to fetch statistics', details: err.message });
+        }
+    });
+
+    return router;
+};
