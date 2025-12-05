@@ -28,10 +28,18 @@ const DepartureHistory = () => {
     totalItems: 0,
     itemsPerPage: 10
   });
+
+  // Fonction pour générer un matricule automatique
+  const generateMatricule = useCallback(() => {
+    const year = new Date().getFullYear();
+    const timestamp = Date.now().toString().slice(-4);
+    return `CDL-${year}-${timestamp}`;
+  }, []);
   
   // Filtres
   const [filters, setFilters] = useState({
     search: '',
+    matricule: '',
     departement: '',
     statut: '',
     motif_depart: '',
@@ -59,6 +67,9 @@ const DepartureHistory = () => {
   const departureSchema = Yup.object().shape({
     nom: Yup.string().required('Le nom est requis'),
     prenom: Yup.string().required('Le prénom est requis'),
+    matricule: Yup.string()
+      .required('Le matricule est requis')
+      .matches(/^CDL-\d{4}-\d{4}$/, 'Le matricule doit être au format CDL-YYYY-XXXX (ex: CDL-2025-0001)'),
     departement: Yup.string().required('Le département est requis'),
     statut: Yup.string().required('Le statut est requis'),
     poste: Yup.string().required('Le poste est requis'),
@@ -107,7 +118,7 @@ const DepartureHistory = () => {
       let response;
       
       // Si des filtres sont appliqués, utilisez la méthode de recherche
-      if (filters.search || filters.departement || filters.statut || filters.motif_depart || filters.date_debut || filters.date_fin) {
+      if (filters.search || filters.matricule || filters.departement || filters.statut || filters.motif_depart || filters.date_debut || filters.date_fin) {
         response = await departService.search(filters);
       } else {
         response = await departService.getAll();
@@ -205,6 +216,7 @@ const DepartureHistory = () => {
   const resetFilters = useCallback(() => {
     setFilters({
       search: '',
+      matricule: '',
       departement: '',
       statut: '',
       motif_depart: '',
@@ -523,6 +535,18 @@ const DepartureHistory = () => {
               </div>
             </div>
             <div className="col-md-3 mb-3">
+              <label htmlFor="matricule" className="form-label">Matricule</label>
+              <input 
+                type="text" 
+                className="form-control" 
+                id="matricule" 
+                name="matricule" 
+                placeholder="CDL-2025-0001" 
+                value={filters.matricule}
+                onChange={handleFilterChange}
+              />
+            </div>
+            <div className="col-md-3 mb-3">
               <label htmlFor="departement" className="form-label">Département</label>
               <select 
                 className="form-select" 
@@ -552,6 +576,8 @@ const DepartureHistory = () => {
                 ))}
               </select>
             </div>
+          </div>
+          <div className="row">
             <div className="col-md-3 mb-3">
               <label htmlFor="motif_depart" className="form-label">Motif de départ</label>
               <select 
@@ -629,6 +655,12 @@ const DepartureHistory = () => {
                         <i className={`fas fa-sort-${sortConfig.direction === 'asc' ? 'up' : 'down'} ms-1`}></i>
                       )}
                     </th>
+                    <th className="sortable" onClick={() => handleSort('matricule')}>
+                      Matricule
+                      {sortConfig.key === 'matricule' && (
+                        <i className={`fas fa-sort-${sortConfig.direction === 'asc' ? 'up' : 'down'} ms-1`}></i>
+                      )}
+                    </th>
                     <th className="sortable" onClick={() => handleSort('date_depart')}>
                       Date de départ
                       {sortConfig.key === 'date_depart' && (
@@ -665,7 +697,7 @@ const DepartureHistory = () => {
                 <tbody>
                   {sortedDepartures.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="text-center py-4">
+                      <td colSpan="8" className="text-center py-4">
                         <div className="empty-state">
                           <i className="fas fa-search fa-3x text-muted mb-3"></i>
                           <h5>Aucun départ trouvé</h5>
@@ -698,6 +730,9 @@ const DepartureHistory = () => {
                               <div>{departure.prenom}</div>
                             </div>
                           </div>
+                        </td>
+                        <td>
+                          <span className="badge bg-secondary">{departure.matricule || 'Non assigné'}</span>
                         </td>
                         <td>{formatDate(departure.date_depart)}</td>
                         <td>{departure.departement || '-'}</td>
@@ -831,6 +866,7 @@ const DepartureHistory = () => {
               initialValues={{
                 nom: '',
                 prenom: '',
+                matricule: generateMatricule(),
                 departement: '',
                 statut: '',
                 poste: '',
@@ -852,7 +888,7 @@ const DepartureHistory = () => {
                     )}
                     
                     <div className="row">
-                      <div className="col-md-6 mb-3">
+                      <div className="col-md-4 mb-3">
                         <label htmlFor="nom" className="form-label">Nom <span className="text-danger">*</span></label>
                         <Field 
                           type="text" 
@@ -863,7 +899,7 @@ const DepartureHistory = () => {
                         />
                         <ErrorMessage name="nom" component="div" className="invalid-feedback" />
                       </div>
-                      <div className="col-md-6 mb-3">
+                      <div className="col-md-4 mb-3">
                         <label htmlFor="prenom" className="form-label">Prénom <span className="text-danger">*</span></label>
                         <Field 
                           type="text" 
@@ -873,6 +909,17 @@ const DepartureHistory = () => {
                           placeholder="Entrez le prénom"
                         />
                         <ErrorMessage name="prenom" component="div" className="invalid-feedback" />
+                      </div>
+                      <div className="col-md-4 mb-3">
+                        <label htmlFor="matricule" className="form-label">Matricule <span className="text-danger">*</span></label>
+                        <Field 
+                          type="text" 
+                          className={`form-control ${errors.matricule && touched.matricule ? 'is-invalid' : ''}`}
+                          id="matricule" 
+                          name="matricule" 
+                          placeholder="CDL-2025-0001"
+                        />
+                        <ErrorMessage name="matricule" component="div" className="invalid-feedback" />
                       </div>
                     </div>
                     
@@ -1051,6 +1098,7 @@ const DepartureHistory = () => {
                       <ul className="mb-2">
                         <li><strong>Nom</strong> - Nom de famille de l'employé</li>
                         <li><strong>Prenom</strong> - Prénom de l'employé</li>
+                        <li><strong>Matricule</strong> - Matricule de l'employé (format CDL-2025-0001)</li>
                         <li><strong>Departement</strong> - Département de l'employé</li>
                         <li><strong>Statut</strong> - Type de contrat</li>
                         <li><strong>Poste</strong> - Intitulé du poste</li>
@@ -1134,6 +1182,14 @@ const DepartureHistory = () => {
               
               <div className="row">
                 <div className="col-md-6">
+                  <div className="info-group">
+                    <div className="info-label">
+                      <i className="fas fa-id-card me-2 text-primary"></i>
+                      Matricule
+                    </div>
+                    <div className="info-value">{selectedDeparture.matricule || 'Non assigné'}</div>
+                  </div>
+                  
                   <div className="info-group">
                     <div className="info-label">
                       <i className="fas fa-building me-2 text-primary"></i>
@@ -1235,6 +1291,7 @@ const DepartureHistory = () => {
                 id: selectedDeparture.id,
                 nom: selectedDeparture.nom,
                 prenom: selectedDeparture.prenom,
+                matricule: selectedDeparture.matricule || generateMatricule(),
                 departement: selectedDeparture.departement || '',
                 statut: selectedDeparture.statut || '',
                 poste: selectedDeparture.poste || '',
@@ -1258,7 +1315,7 @@ const DepartureHistory = () => {
                     <input type="hidden" name="id" />
                     
                     <div className="row">
-                      <div className="col-md-6 mb-3">
+                      <div className="col-md-4 mb-3">
                         <label htmlFor="nom" className="form-label">Nom <span className="text-danger">*</span></label>
                         <Field 
                           type="text" 
@@ -1268,7 +1325,7 @@ const DepartureHistory = () => {
                         />
                         <ErrorMessage name="nom" component="div" className="invalid-feedback" />
                       </div>
-                      <div className="col-md-6 mb-3">
+                      <div className="col-md-4 mb-3">
                         <label htmlFor="prenom" className="form-label">Prénom <span className="text-danger">*</span></label>
                         <Field 
                           type="text" 
@@ -1277,6 +1334,16 @@ const DepartureHistory = () => {
                           name="prenom" 
                         />
                         <ErrorMessage name="prenom" component="div" className="invalid-feedback" />
+                      </div>
+                      <div className="col-md-4 mb-3">
+                        <label htmlFor="matricule" className="form-label">Matricule <span className="text-danger">*</span></label>
+                        <Field 
+                          type="text" 
+                          className={`form-control ${errors.matricule && touched.matricule ? 'is-invalid' : ''}`}
+                          id="matricule" 
+                          name="matricule" 
+                        />
+                        <ErrorMessage name="matricule" component="div" className="invalid-feedback" />
                       </div>
                     </div>
                     

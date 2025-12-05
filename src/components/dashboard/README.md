@@ -212,3 +212,11 @@ npm run build
 **Auteur :** Assistant IA  
 **Version :** 1.0.0  
 **Dernière mise à jour :** Décembre 2024
+
+
+
+
+
+
+
+

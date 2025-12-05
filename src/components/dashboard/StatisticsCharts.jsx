@@ -48,7 +48,7 @@ const StatisticsCharts = () => {
         setLoading(true);
         setError(null);
         
-        const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+        const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
         const token = sessionStorage.getItem('token');
         
         const headers = {

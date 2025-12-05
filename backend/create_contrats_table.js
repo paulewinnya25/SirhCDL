@@ -88,3 +88,11 @@ async function createContratsTable() {
 }
 
 createContratsTable().catch(console.error);
+
+
+
+
+
+
+
+

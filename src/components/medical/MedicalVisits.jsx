@@ -14,6 +14,7 @@ const MedicalVisits = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [reminderTarget, setReminderTarget] = useState(null);
   const [notification, setNotification] = useState({ show: false, message: '', type: '' });
   const [search, setSearch] = useState('');
@@ -299,6 +300,41 @@ const MedicalVisits = () => {
       setIsLoading(false);
     }
   }, [visites, calculateStats, showNotificationMessage]);
+
+  // Handle delete visite
+  const handleDeleteVisite = useCallback(async (visiteId) => {
+    try {
+      setIsLoading(true);
+      
+      // Call API to delete visite
+      await visiteMedicaleService.delete(visiteId);
+      
+      // Remove from local state
+      const updatedVisites = visites.filter(v => v.id !== visiteId);
+      setVisites(updatedVisites);
+      
+      // Recalculate stats with the updated list
+      calculateStats(updatedVisites);
+      
+      // Success notification
+      showNotificationMessage('La visite médicale a été supprimée avec succès.', 'success');
+      
+      // Close delete modal
+      setShowDeleteModal(false);
+      setSelectedVisite(null);
+    } catch (err) {
+      console.error('Error deleting visite:', err);
+      setError('Erreur lors de la suppression de la visite médicale. Veuillez réessayer.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [visites, calculateStats, showNotificationMessage]);
+
+  // Open delete modal
+  const handleShowDeleteModal = useCallback((visite) => {
+    setSelectedVisite(visite);
+    setShowDeleteModal(true);
+  }, []);
 
   // Handle status update form submission
   const handleUpdateStatus = useCallback(async (values) => {
@@ -887,6 +923,14 @@ const MedicalVisits = () => {
                               >
                                 <i className="fas fa-bell"></i>
                               </button>
+                              <button 
+                                type="button" 
+                                className="btn btn-sm btn-outline-danger" 
+                                onClick={() => handleShowDeleteModal(visite)}
+                                title="Supprimer la visite"
+                              >
+                                <i className="fas fa-trash"></i>
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -1433,6 +1477,49 @@ const MedicalVisits = () => {
                 </Form>
               )}
             </Formik>
+          </div>
+        </div>
+      )}
+      
+      {/* Delete Visite Modal */}
+      {showDeleteModal && selectedVisite && (
+        <div className="modal-backdrop">
+          <div className="modal-content">
+            <div className="modal-header bg-danger text-white">
+              <h5 className="modal-title">
+                <i className="fas fa-trash-alt me-2"></i>
+                Supprimer la visite médicale
+              </h5>
+              <button 
+                type="button" 
+                className="btn-close btn-close-white" 
+                onClick={() => setShowDeleteModal(false)}
+              ></button>
+            </div>
+            <div className="modal-body">
+              <p>
+                Êtes-vous sûr de vouloir supprimer la visite médicale de {selectedVisite.nom} {selectedVisite.prenom} (Poste: {selectedVisite.poste}) ?
+                Cette action est irréversible.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-outline-secondary" 
+                onClick={() => setShowDeleteModal(false)}
+              >
+                <i className="fas fa-times me-2"></i>
+                Annuler
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-danger" 
+                onClick={() => handleDeleteVisite(selectedVisite.id)}
+              >
+                <i className="fas fa-trash-alt me-2"></i>
+                Supprimer
+              </button>
+            </div>
           </div>
         </div>
       )}

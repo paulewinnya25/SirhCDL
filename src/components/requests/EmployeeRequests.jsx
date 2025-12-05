@@ -44,6 +44,8 @@ const EmployeeRequests = () => {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   
   // Fonction pour afficher des notifications
   const showNotification = useCallback((message, type = 'success') => {
@@ -214,6 +216,11 @@ const EmployeeRequests = () => {
       setShowApproveModal(false);
       setComments('');
       
+      // Émettre un événement pour la mise à jour en temps réel
+      window.dispatchEvent(new CustomEvent('requestProcessed', {
+        detail: { requestId: selectedRequest.id, action: 'approved' }
+      }));
+      
       // Si on est en vue détaillée, mettre à jour la demande sélectionnée
       if (detailView) {
         setSelectedRequest(result);
@@ -258,6 +265,11 @@ const EmployeeRequests = () => {
       setShowRejectModal(false);
       setComments('');
       
+      // Émettre un événement pour la mise à jour en temps réel
+      window.dispatchEvent(new CustomEvent('requestProcessed', {
+        detail: { requestId: selectedRequest.id, action: 'rejected' }
+      }));
+      
       // Si on est en vue détaillée, mettre à jour la demande sélectionnée
       if (detailView) {
         setSelectedRequest(result);
@@ -291,6 +303,54 @@ const EmployeeRequests = () => {
     } catch (err) {
       console.error(`Error exporting to ${format}:`, err);
       setError(`Erreur lors de l'exportation en ${format.toUpperCase()}`);
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  // Gérer la suppression de toutes les demandes
+  const handleDeleteAll = async () => {
+    setLoadingAction(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/requests/all', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur lors de la suppression');
+      }
+      
+      const result = await response.json();
+      
+      // Réinitialiser les données
+      setRequests([]);
+      setFilteredRequests([]);
+      setStats({
+        total: 0,
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        leaves: 0,
+        absences: 0,
+        documents: 0
+      });
+      
+      showNotification(`Toutes les demandes ont été supprimées avec succès (${result.deletedCount} lignes supprimées)`, 'success');
+      setShowDeleteAllModal(false);
+      setConfirmDeleteAll(false);
+      
+      // Émettre un événement pour la mise à jour en temps réel
+      window.dispatchEvent(new CustomEvent('allRequestsDeleted'));
+    } catch (err) {
+      console.error('Error deleting all requests:', err);
+      setError(err.message || 'Erreur lors de la suppression de toutes les demandes. Veuillez réessayer.');
     } finally {
       setLoadingAction(false);
     }
@@ -396,6 +456,14 @@ const EmployeeRequests = () => {
           <p className="page-subtitle">Gérez les demandes administratives et documentaires des employés.</p>
         </div>
         <div className="title-actions">
+          <button 
+            className="btn btn-outline-danger me-2" 
+            onClick={() => setShowDeleteAllModal(true)}
+            disabled={requests.length === 0}
+            title={requests.length === 0 ? 'Aucune demande à supprimer' : 'Supprimer toutes les demandes'}
+          >
+            <i className="fas fa-trash-alt me-2"></i>Supprimer tout
+          </button>
           <button className="btn btn-outline-primary me-2" onClick={() => setShowExportModal(true)}>
             <i className="fas fa-download me-2"></i>Exporter
           </button>
@@ -1183,6 +1251,99 @@ const EmployeeRequests = () => {
         </div>
       )}
 
+      {/* Delete All Modal */}
+      {showDeleteAllModal && (
+        <div className="modal-backdrop animated fadeIn">
+          <div className="modal-content animated zoomIn" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h5 className="modal-title">
+                <i className="fas fa-exclamation-triangle text-danger me-2"></i>
+                Supprimer toutes les demandes
+              </h5>
+              <button 
+                type="button" 
+                className="btn-close" 
+                onClick={() => {
+                  setShowDeleteAllModal(false);
+                  setConfirmDeleteAll(false);
+                }}
+                disabled={loadingAction}
+              ></button>
+            </div>
+            <div className="modal-body">
+              <div className="mb-3">
+                <div className="alert alert-danger">
+                  <div className="d-flex">
+                    <div className="me-3">
+                      <i className="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                    <div>
+                      <h6 className="alert-heading">Attention !</h6>
+                      <p className="mb-0">Vous êtes sur le point de supprimer <strong>toutes les demandes</strong> des employés.</p>
+                      <p className="mb-0 mt-2"><strong>Cette action est irréversible.</strong></p>
+                      <p className="mb-0 mt-1">Nombre total de demandes à supprimer : <strong>{stats.total}</strong></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mb-3">
+                <p className="text-muted">
+                  <i className="fas fa-info-circle me-2"></i>
+                  Toutes les demandes (en attente, approuvées et refusées) seront définitivement supprimées de la base de données.
+                </p>
+              </div>
+              
+              <div className="form-check mb-3">
+                <input 
+                  className="form-check-input" 
+                  type="checkbox" 
+                  id="confirmDeleteAll"
+                  checked={confirmDeleteAll}
+                  onChange={(e) => setConfirmDeleteAll(e.target.checked)}
+                  required
+                />
+                <label className="form-check-label" htmlFor="confirmDeleteAll">
+                  Je confirme vouloir supprimer toutes les demandes
+                </label>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-outline-secondary" 
+                onClick={() => {
+                  setShowDeleteAllModal(false);
+                  setConfirmDeleteAll(false);
+                }}
+                disabled={loadingAction}
+              >
+                <i className="fas fa-times me-2"></i>
+                Annuler
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-danger" 
+                onClick={handleDeleteAll}
+                disabled={loadingAction || !confirmDeleteAll}
+              >
+                {loadingAction ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                    Suppression...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-trash-alt me-2"></i>
+                    Supprimer toutes les demandes
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Export Modal */}
       {showExportModal && (
         <div className="modal-backdrop animated fadeIn">
@@ -1737,3 +1898,5 @@ const EmployeeRequests = () => {
 };
 
 export default EmployeeRequests;
+
+

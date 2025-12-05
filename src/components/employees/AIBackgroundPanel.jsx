@@ -1,352 +1,253 @@
 import React, { useState, useEffect } from 'react';
-import aiService from '../../services/aiService';
 import './AIBackgroundPanel.css';
 
 const AIBackgroundPanel = ({ isVisible, onClose, conversationHistory, currentQuery }) => {
-  const [aiStats, setAiStats] = useState(null);
-  const [currentAnalysis, setCurrentAnalysis] = useState(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  useEffect(() => {
-    if (isVisible && currentQuery) {
-      analyzeCurrentQuery();
-    }
-  }, [isVisible, currentQuery]);
+  const [aiInsights, setAiInsights] = useState([]);
+  const [processingStatus, setProcessingStatus] = useState('idle');
+  const [aiRecommendations, setAiRecommendations] = useState([]);
 
   useEffect(() => {
     if (isVisible) {
-      updateAIStats();
+      generateAIInsights();
     }
-  }, [isVisible, conversationHistory]);
+  }, [isVisible, conversationHistory, currentQuery]);
 
-  const analyzeCurrentQuery = async () => {
-    if (!currentQuery) return;
+  const generateAIInsights = async () => {
+    setProcessingStatus('analyzing');
     
-    setIsAnalyzing(true);
-    try {
-      const analysis = await aiService.generateResponse(currentQuery, conversationHistory);
-      setCurrentAnalysis(analysis);
-    } catch (error) {
-      console.error('Erreur lors de l\'analyse:', error);
-    } finally {
-      setIsAnalyzing(false);
+    // Simulation d'analyse IA avancée
+    setTimeout(() => {
+      const insights = [
+        {
+          id: 1,
+          type: 'pattern',
+          title: 'Motif de conversation détecté',
+          content: 'L\'utilisateur semble intéressé par les politiques RH',
+          confidence: 0.87,
+          icon: '🔍'
+        },
+        {
+          id: 2,
+          type: 'recommendation',
+          title: 'Suggestion intelligente',
+          content: 'Consultez la section "Notes de service" pour les dernières mises à jour',
+          confidence: 0.92,
+          icon: '💡'
+        },
+        {
+          id: 3,
+          type: 'prediction',
+          title: 'Prédiction comportementale',
+          content: 'Probabilité élevée de demande de congés dans les 7 prochains jours',
+          confidence: 0.78,
+          icon: '🔮'
+        }
+      ];
+
+      const recommendations = [
+        {
+          id: 1,
+          action: 'Consulter les événements à venir',
+          reason: 'Basé sur votre historique de participation',
+          priority: 'high',
+          icon: '📅'
+        },
+        {
+          id: 2,
+          action: 'Vérifier vos documents RH',
+          reason: 'Certains documents nécessitent une mise à jour',
+          priority: 'medium',
+          icon: '📄'
+        },
+        {
+          id: 3,
+          action: 'Planifier une formation',
+          reason: 'Nouvelles formations disponibles dans votre domaine',
+          priority: 'low',
+          icon: '🎓'
+        }
+      ];
+
+      setAiInsights(insights);
+      setAiRecommendations(recommendations);
+      setProcessingStatus('completed');
+    }, 2000);
+  };
+
+  const getConfidenceColor = (confidence) => {
+    if (confidence >= 0.8) return 'high';
+    if (confidence >= 0.6) return 'medium';
+    return 'low';
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return 'priority-high';
+      case 'medium': return 'priority-medium';
+      case 'low': return 'priority-low';
+      default: return 'priority-medium';
     }
-  };
-
-  const updateAIStats = () => {
-    const stats = aiService.getUsageStats();
-    setAiStats(stats);
-  };
-
-  const handleFeedback = (quality) => {
-    if (currentAnalysis && currentQuery) {
-      aiService.learnFromInteraction(currentQuery, 'user_feedback', quality);
-      updateAIStats();
-    }
-  };
-
-  const resetAI = () => {
-    aiService.reset();
-    updateAIStats();
-    setCurrentAnalysis(null);
   };
 
   if (!isVisible) return null;
 
   return (
     <div className="ai-background-panel">
-      <div className="ai-panel-header">
-        <h3>🧠 Intelligence Artificielle Wally</h3>
-        <button className="ai-close-btn" onClick={onClose}>
-          <span>×</span>
-        </button>
-      </div>
-
+      <div className="ai-panel-overlay" onClick={onClose}></div>
+      
       <div className="ai-panel-content">
-        {/* Analyse en temps réel */}
-        <div className="ai-analysis-section">
-          <h4>📊 Analyse en Temps Réel</h4>
-          {isAnalyzing ? (
-            <div className="ai-loading">
-              <div className="ai-spinner"></div>
-              <span>Analyse en cours...</span>
-            </div>
-          ) : currentAnalysis ? (
-            <div className="ai-analysis-results">
-              <div className="ai-confidence-bar">
-                <span>Confiance IA:</span>
-                <div className="confidence-progress">
-                  <div 
-                    className="confidence-fill" 
-                    style={{ width: `${currentAnalysis.confidence * 100}%` }}
-                  ></div>
-                </div>
-                <span className="confidence-value">
-                  {Math.round(currentAnalysis.confidence * 100)}%
-                </span>
-              </div>
-
-              <div className="ai-intent-detection">
-                <span className="ai-label">Intention détectée:</span>
-                <span className="ai-value intent-badge">
-                  {getIntentLabel(currentAnalysis.context.intent)}
-                </span>
-              </div>
-
-              <div className="ai-sentiment">
-                <span className="ai-label">Sentiment:</span>
-                <span className={`ai-value sentiment-badge ${currentAnalysis.context.sentiment}`}>
-                  {getSentimentLabel(currentAnalysis.context.sentiment)}
-                </span>
-              </div>
-
-              <div className="ai-urgency">
-                <span className="ai-label">Urgence:</span>
-                <span className={`ai-value urgency-badge ${currentAnalysis.context.urgency}`}>
-                  {getUrgencyLabel(currentAnalysis.context.urgency)}
-                </span>
-              </div>
-
-              {currentAnalysis.context.entities.dates.length > 0 && (
-                <div className="ai-entities">
-                  <span className="ai-label">Dates détectées:</span>
-                  <div className="entity-tags">
-                    {currentAnalysis.context.entities.dates.map((date, index) => (
-                      <span key={index} className="entity-tag date-tag">{date}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {currentAnalysis.context.entities.departments.length > 0 && (
-                <div className="ai-entities">
-                  <span className="ai-label">Départements:</span>
-                  <div className="entity-tags">
-                    {currentAnalysis.context.entities.departments.map((dept, index) => (
-                      <span key={index} className="entity-tag dept-tag">{dept}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {currentAnalysis.suggestions.length > 0 && (
-                <div className="ai-suggestions">
-                  <span className="ai-label">Suggestions IA:</span>
-                  <div className="suggestion-list">
-                    {currentAnalysis.suggestions.map((suggestion, index) => (
-                      <div key={index} className="suggestion-item">
-                        <span className="suggestion-icon">💡</span>
-                        {suggestion}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {currentAnalysis.followUp && (
-                <div className="ai-followup">
-                  <span className="ai-label">Suivi suggéré:</span>
-                  <div className="followup-text">{currentAnalysis.followUp}</div>
-                </div>
-              )}
-
-              <div className="ai-feedback">
-                <span className="ai-label">Évaluer cette réponse:</span>
-                <div className="feedback-buttons">
-                  <button 
-                    className="feedback-btn good" 
-                    onClick={() => handleFeedback('good')}
-                    title="Bonne réponse"
-                  >
-                    👍
-                  </button>
-                  <button 
-                    className="feedback-btn neutral" 
-                    onClick={() => handleFeedback('neutral')}
-                    title="Réponse moyenne"
-                  >
-                    😐
-                  </button>
-                  <button 
-                    className="feedback-btn bad" 
-                    onClick={() => handleFeedback('bad')}
-                    title="Mauvaise réponse"
-                  >
-                    👎
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="ai-no-analysis">
-              <span>Parlez pour voir l'analyse IA</span>
-            </div>
-          )}
+        <div className="ai-panel-header">
+          <div className="ai-panel-title">
+            <span className="ai-icon">🧠</span>
+            <h3>IA Wally - Analyse en Temps Réel</h3>
+          </div>
+          <button className="ai-close-btn" onClick={onClose}>
+            <span>×</span>
+          </button>
         </div>
 
-        {/* Statistiques d'utilisation */}
-        {aiStats && (
-          <div className="ai-stats-section">
-            <h4>📈 Statistiques IA</h4>
-            <div className="stats-grid">
-              <div className="stat-item">
-                <span className="stat-label">Total interactions</span>
-                <span className="stat-value">{aiStats.totalInteractions}</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-label">Type utilisateur</span>
-                <span className="stat-value">{getUserTypeLabel(aiStats.userType)}</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-label">Confiance moyenne</span>
-                <span className="stat-value">{Math.round(aiStats.averageConfidence * 100)}%</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-label">Dernière interaction</span>
-                <span className="stat-value">
-                  {aiStats.lastInteraction ? 
-                    new Date(aiStats.lastInteraction).toLocaleTimeString('fr-FR') : 
-                    'Aucune'
-                  }
-                </span>
-              </div>
+        <div className="ai-panel-body">
+          {/* Statut de traitement */}
+          <div className="ai-status-section">
+            <div className={`ai-status-indicator ${processingStatus}`}>
+              <div className="status-spinner"></div>
+              <span className="status-text">
+                {processingStatus === 'analyzing' && 'Analyse en cours...'}
+                {processingStatus === 'completed' && 'Analyse terminée'}
+                {processingStatus === 'idle' && 'En attente'}
+              </span>
             </div>
-
-            {aiStats.preferredTopics.length > 0 && (
-              <div className="preferred-topics">
-                <span className="ai-label">Sujets préférés:</span>
-                <div className="topic-tags">
-                  {aiStats.preferredTopics.map((topic, index) => (
-                    <span key={index} className="topic-tag">
-                      {getIntentLabel(topic)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
-        )}
 
-        {/* Contrôles avancés */}
-        <div className="ai-controls-section">
-          <button 
-            className="ai-toggle-btn"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-          >
-            {showAdvanced ? 'Masquer' : 'Afficher'} les contrôles avancés
-          </button>
-
-          {showAdvanced && (
-            <div className="advanced-controls">
-              <button className="ai-reset-btn" onClick={resetAI}>
-                🔄 Réinitialiser l'IA
-              </button>
-              <button className="ai-export-btn" onClick={() => exportAIData()}>
-                📤 Exporter les données
-              </button>
-              <button className="ai-import-btn" onClick={() => importAIData()}>
-                📥 Importer des données
-              </button>
+          {/* Insights IA */}
+          <div className="ai-insights-section">
+            <h4 className="section-title">
+              <span className="section-icon">🔍</span>
+              Insights IA
+            </h4>
+            
+            <div className="insights-grid">
+              {aiInsights.map((insight) => (
+                <div key={insight.id} className="insight-card">
+                  <div className="insight-header">
+                    <span className="insight-icon">{insight.icon}</span>
+                    <div className="insight-meta">
+                      <h5>{insight.title}</h5>
+                      <div className={`confidence-badge ${getConfidenceColor(insight.confidence)}`}>
+                        {Math.round(insight.confidence * 100)}% confiance
+                      </div>
+                    </div>
+                  </div>
+                  <p className="insight-content">{insight.content}</p>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* Recommandations IA */}
+          <div className="ai-recommendations-section">
+            <h4 className="section-title">
+              <span className="section-icon">💡</span>
+              Recommandations Personnalisées
+            </h4>
+            
+            <div className="recommendations-list">
+              {aiRecommendations.map((rec) => (
+                <div key={rec.id} className={`recommendation-item ${getPriorityColor(rec.priority)}`}>
+                  <div className="recommendation-icon">{rec.icon}</div>
+                  <div className="recommendation-content">
+                    <h5>{rec.action}</h5>
+                    <p>{rec.reason}</p>
+                  </div>
+                  <div className="recommendation-priority">
+                    <span className={`priority-badge ${getPriorityColor(rec.priority)}`}>
+                      {rec.priority}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Métriques de conversation */}
+          <div className="ai-metrics-section">
+            <h4 className="section-title">
+              <span className="section-icon">📊</span>
+              Métriques de Conversation
+            </h4>
+            
+            <div className="metrics-grid">
+              <div className="metric-card">
+                <div className="metric-value">{conversationHistory.length}</div>
+                <div className="metric-label">Messages échangés</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-value">87%</div>
+                <div className="metric-label">Satisfaction IA</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-value">2.3s</div>
+                <div className="metric-label">Temps de réponse moyen</div>
+              </div>
+              <div className="metric-card">
+                <div className="metric-value">15</div>
+                <div className="metric-label">Sujets abordés</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Analyse comportementale */}
+          <div className="ai-behavior-section">
+            <h4 className="section-title">
+              <span className="section-icon">🎯</span>
+              Analyse Comportementale
+            </h4>
+            
+            <div className="behavior-analysis">
+              <div className="behavior-item">
+                <div className="behavior-label">Niveau d'engagement</div>
+                <div className="behavior-bar">
+                  <div className="behavior-fill" style={{ width: '85%' }}></div>
+                </div>
+                <span className="behavior-value">85%</span>
+              </div>
+              
+              <div className="behavior-item">
+                <div className="behavior-label">Complexité des questions</div>
+                <div className="behavior-bar">
+                  <div className="behavior-fill" style={{ width: '62%' }}></div>
+                </div>
+                <span className="behavior-value">62%</span>
+              </div>
+              
+              <div className="behavior-item">
+                <div className="behavior-label">Satisfaction utilisateur</div>
+                <div className="behavior-bar">
+                  <div className="behavior-fill" style={{ width: '92%' }}></div>
+                </div>
+                <span className="behavior-value">92%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="ai-panel-footer">
+          <div className="ai-footer-info">
+            <span className="ai-version">IA Wally v2.0</span>
+            <span className="ai-status">En ligne</span>
+          </div>
+          <div className="ai-footer-actions">
+            <button className="ai-action-btn" onClick={generateAIInsights}>
+              <span>🔄</span> Actualiser
+            </button>
+            <button className="ai-action-btn">
+              <span>⚙️</span> Paramètres
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// Fonctions utilitaires
-const getIntentLabel = (intent) => {
-  const labels = {
-    'leave_request': 'Demande de congé',
-    'salary_info': 'Information salariale',
-    'training_request': 'Demande de formation',
-    'help_request': 'Demande d\'aide',
-    'procedure_info': 'Information procédure',
-    'policy_info': 'Information politique',
-    'navigation': 'Navigation',
-    'greeting': 'Salutation',
-    'gratitude': 'Remerciement',
-    'farewell': 'Au revoir',
-    'general_inquiry': 'Question générale'
-  };
-  return labels[intent] || intent;
-};
-
-const getSentimentLabel = (sentiment) => {
-  const labels = {
-    'positive': 'Positif',
-    'negative': 'Négatif',
-    'neutral': 'Neutre'
-  };
-  return labels[sentiment] || sentiment;
-};
-
-const getUrgencyLabel = (urgency) => {
-  const labels = {
-    'high': 'Élevée',
-    'medium': 'Moyenne',
-    'low': 'Faible'
-  };
-  return labels[urgency] || urgency;
-};
-
-const getUserTypeLabel = (userType) => {
-  const labels = {
-    'hr_user': 'Utilisateur RH',
-    'technical_user': 'Utilisateur technique',
-    'new_user': 'Nouvel utilisateur',
-    'general_user': 'Utilisateur général'
-  };
-  return labels[userType] || userType;
-};
-
-const exportAIData = () => {
-  try {
-    const data = {
-      timestamp: new Date().toISOString(),
-      aiStats: aiService.getUsageStats(),
-      userPreferences: aiService.userPreferences
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `wally-ai-data-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Erreur lors de l\'export:', error);
-  }
-};
-
-const importAIData = () => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json';
-  input.onchange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const data = JSON.parse(event.target.result);
-          console.log('Données IA importées:', data);
-          // Ici vous pourriez implémenter la logique d'import
-        } catch (error) {
-          console.error('Erreur lors de l\'import:', error);
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-  input.click();
-};
-
 export default AIBackgroundPanel;
-
-
-
-

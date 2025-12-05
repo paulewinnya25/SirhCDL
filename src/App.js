@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Importations des composants
-import Login from './components/auth/Login';
-import EmployeeLogin from './components/employees/EmployeeLogin';
+import UnifiedLogin from './components/auth/UnifiedLogin';
 import MedicalLogin from './components/medical/MedicalLogin';
 import Dashboard from './components/dashboard/Dashboard';
 import NewEmployee from './components/employees/NewEmployee';
@@ -13,6 +13,7 @@ import LeaveManagement from './components/leaves/LeaveManagement';
 import Sanctions from './components/hr/Sanctions';
 import AbsenceManagement from './components/leaves/AbsenceManagement';
 import ContractManagement from './components/contracts/ContractManagement';
+import ContratPDFManager from './components/contracts/ContratPDFManager';
 import RecruitmentHistory from './components/recruitment/RecruitmentHistory';
 import DepartureHistory from './components/employees/DepartureHistory';
 import PerformanceManagement from './components/performance/PerformanceManagement';
@@ -28,24 +29,20 @@ import EventManagement from './components/event/EventManagement';
 import EditEmployee from './components/employees/EditEmployee';
 import Onboarding from './components/onboarding/Onboarding';
 import Offboarding from './components/onboarding/Offboarding';
-import Interviews from './components/hr/Interviews';
-import HRTasks from './components/hr/HRTasks';
+import InterviewManagement from './components/hr/InterviewManagement';
+import TaskManagement from './components/hr/TaskManagement';
+import RHMessagingSimple from './components/hr/RHMessagingSimple';
+
+import MedicalAccess from './components/medical/MedicalAccess';
 import ChartsPage from './components/dashboard/ChartsPage';
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+// Composant principal avec authentification
+function AppContent() {
+  const { user, isAuthenticated, logout } = useAuth();
   const [isEmployeeAuthenticated, setIsEmployeeAuthenticated] = useState(false);
   const [isMedicalAuthenticated, setIsMedicalAuthenticated] = useState(false);
   
   useEffect(() => {
-    // Check admin authentication
-    const storedUser = sessionStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-      setIsAuthenticated(true);
-    }
-
     // Check employee authentication
     const storedEmployeeUser = sessionStorage.getItem('employeeUser');
     if (storedEmployeeUser) {
@@ -59,21 +56,8 @@ function App() {
     }
   }, []);
 
-  const handleAdminLogin = (userData) => {
-    setUser(userData);
-    setIsAuthenticated(true);
-    sessionStorage.setItem('user', JSON.stringify(userData));
-  };
-
   const handleAdminLogout = () => {
-    setUser(null);
-    setIsAuthenticated(false);
-    sessionStorage.removeItem('user');
-  };
-
-  const handleEmployeeLogin = (userData) => {
-    setIsEmployeeAuthenticated(true);
-    sessionStorage.setItem('employeeUser', JSON.stringify(userData));
+    logout();
   };
 
   const handleEmployeeLogout = () => {
@@ -87,127 +71,154 @@ function App() {
   };
 
   return (
-    <Router>
-      <Routes>
-        {/* Home Route - Redirects based on user type */}
-        <Route 
-          path="/home" 
-          element={
-            isAuthenticated ? 
-            <Navigate to="/dashboard" replace /> : 
-            isEmployeeAuthenticated ? 
-            <Navigate to="/EmployeePortal" replace /> :
-            isMedicalAuthenticated ? 
-            <Navigate to="/medical-file-tracking" replace /> :
-            <Navigate to="/login" replace />
-          } 
-        />
+    <Routes>
+      {/* Home Route - Redirects based on user type */}
+      <Route 
+        path="/home" 
+        element={
+          isAuthenticated ? 
+          <Navigate to="/dashboard" replace /> : 
+          isEmployeeAuthenticated ? 
+          <Navigate to="/EmployeePortal" replace /> :
+          isMedicalAuthenticated ? 
+          <Navigate to="/medical-file-tracking" replace /> :
+          <Navigate to="/login" replace />
+        } 
+      />
 
-        {/* Admin Login Route */}
-        <Route 
-          path="/login" 
-          element={
-            isAuthenticated ? 
-            <Navigate to="/dashboard" replace /> : 
-            <Login onLogin={handleAdminLogin} />
-          } 
-        />
+      {/* Unified Login Route (RH + Employees) */}
+      <Route 
+        path="/login" 
+        element={
+          isAuthenticated ? 
+          <Navigate to="/dashboard" replace /> : 
+          isEmployeeAuthenticated ? 
+          <Navigate to="/EmployeePortal" replace /> :
+          <UnifiedLogin />
+        } 
+      />
 
-        {/* Employee Login Route */}
-        <Route 
-          path="/employee-login" 
-          element={
-            isEmployeeAuthenticated ? 
-            <Navigate to="/EmployeePortal" replace /> : 
-            <EmployeeLogin onLogin={handleEmployeeLogin} />
-          } 
-        />
+      {/* Employee Login Route (redirect to unified login) */}
+      <Route 
+        path="/employee-login" 
+        element={<Navigate to="/login" replace />} 
+      />
 
-        {/* Medical Login Route */}
-        <Route 
-          path="/medical-login" 
-          element={
-            isMedicalAuthenticated ? 
-            <Navigate to="/medical-file-tracking" replace /> : 
-            <MedicalLogin onLogin={handleMedicalLogin} />
-          } 
-        />
+      {/* Medical Login Route */}
+      <Route 
+        path="/medical-login" 
+        element={
+          isMedicalAuthenticated ? 
+          <Navigate to="/medical-file-tracking" replace /> : 
+          <MedicalLogin onLogin={handleMedicalLogin} />
+        } 
+      />
+      
+      {/* Protected Admin Routes */}
+      <Route 
+        path="/" 
+        element={
+          isAuthenticated ? 
+          <Layout user={user} onLogout={handleAdminLogout} /> : 
+          isEmployeeAuthenticated ? 
+          <Navigate to="/EmployeePortal" replace /> :
+          isMedicalAuthenticated ? 
+          <Navigate to="/medical-file-tracking" replace /> :
+          <Navigate to="/login" replace />
+        }
+      >
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="new-employee" element={<NewEmployee />} />
+        <Route path="employees" element={<EmployeeList />} />
+        <Route path="employees/:id" element={<EmployeeDetail />} />
+        <Route path="leave-management" element={<LeaveManagement />} />
+        <Route path="absences" element={<AbsenceManagement />} />
+        <Route path="sanctions" element={<Sanctions />} />
+        <Route path="contrats" element={<ContractManagement />} />
+        <Route path="contrats-pdf" element={<ContratPDFManager />} />
+        <Route path="performance-management" element={<PerformanceManagement />} />
+        <Route path="service-notes" element={<ServiceNotes />} />
+        <Route path="employee-requests" element={<EmployeeRequests />} />
+        <Route path="recruitment-history" element={<RecruitmentHistory />} />
+        <Route path="departure-history" element={<DepartureHistory />} />
+        <Route path="medical-visits" element={<MedicalVisits />} />
+        <Route path="procedure-tracking" element={<ProcedureTracking />} />
+        <Route path="contract-alerts" element={<ContractAlerts />} />
+        <Route path="events" element={<EventManagement />} />
+        <Route path="edit-employee/:id" element={<EditEmployee />} />
+        <Route path="onboarding" element={<Onboarding />} />
+        <Route path="offboarding" element={<Offboarding />} />
+        <Route path="interviews" element={<InterviewManagement />} />
+        <Route path="tasks" element={<TaskManagement />} />
+        <Route path="charts" element={<ChartsPage />} />
+        <Route path="messaging" element={<RHMessagingSimple user={user} />} />
         
-        {/* Protected Admin Routes */}
-        <Route 
-          path="/" 
-          element={
-            isAuthenticated ? 
-            <Layout user={user} onLogout={handleAdminLogout} /> : 
-            isEmployeeAuthenticated ? 
-            <Navigate to="/EmployeePortal" replace /> :
-            isMedicalAuthenticated ? 
-            <Navigate to="/medical-file-tracking" replace /> :
-            <Navigate to="/login" replace />
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="new-employee" element={<NewEmployee />} />
-          <Route path="employees" element={<EmployeeList />} />
-          <Route path="employees/:id" element={<EmployeeDetail />} />
-          <Route path="leave-management" element={<LeaveManagement />} />
-          <Route path="absences" element={<AbsenceManagement />} />
-          <Route path="sanctions" element={<Sanctions />} />
-          <Route path="contrats" element={<ContractManagement />} />
-          <Route path="performance-management" element={<PerformanceManagement />} />
-          <Route path="service-notes" element={<ServiceNotes />} />
-          <Route path="employee-requests" element={<EmployeeRequests />} />
-          <Route path="recruitment-history" element={<RecruitmentHistory />} />
-          <Route path="departure-history" element={<DepartureHistory />} />
-          <Route path="medical-visits" element={<MedicalVisits />} />
-          <Route path="procedure-tracking" element={<ProcedureTracking />} />
-          <Route path="contract-alerts" element={<ContractAlerts />} />
-          <Route path="events" element={<EventManagement />} />
-          <Route path="edit-employee/:id" element={<EditEmployee />} />
-          <Route path="onboarding" element={<Onboarding />} />
-          <Route path="offboarding" element={<Offboarding />} />
-          <Route path="interviews" element={<Interviews />} />
-          <Route path="hr-tasks" element={<HRTasks />} />
-          <Route path="charts" element={<ChartsPage />} />
-          
-        </Route>
+        {/* Routes pour les fonctionnalités de la TopNav */}
+        <Route path="help" element={<div>Page Aide - À implémenter</div>} />
+        <Route path="notifications" element={<div>Page Notifications - À implémenter</div>} />
+        <Route path="messages" element={<div>Page Messages - À implémenter</div>} />
+      </Route>
 
-        {/* Protected Employee Routes */}
-        <Route 
-          path="/EmployeePortal" 
-          element={
-            isEmployeeAuthenticated ? 
-            <EmployeePortal onLogout={handleEmployeeLogout} /> : 
-            <Navigate to="/employee-login" replace />
-          } 
-        />
+      {/* Protected Employee Routes */}
+      <Route 
+        path="/EmployeePortal" 
+        element={
+          (() => {
+            // Vérifier directement dans sessionStorage pour une détection en temps réel
+            const employeeUser = sessionStorage.getItem('employeeUser');
+            const isAuth = !!employeeUser || isEmployeeAuthenticated;
+            
+            if (isAuth) {
+              return <EmployeePortal onLogout={handleEmployeeLogout} />;
+            } else {
+              return <Navigate to="/login" replace />;
+            }
+          })()
+        } 
+      />
 
-        {/* Protected Medical Routes */}
-        <Route 
-          path="/medical-file-tracking" 
-          element={
-            isMedicalAuthenticated ? 
-            <MedicalFileTracking /> : 
-            <Navigate to="/medical-login" replace />
-          } 
-        />
-        
-        {/* Default Redirect */}
-        <Route 
-          path="*" 
-          element={
-            isAuthenticated ? 
-            <Navigate to="/dashboard" replace /> : 
-            isEmployeeAuthenticated ? 
-            <Navigate to="/EmployeePortal" replace /> :
-            isMedicalAuthenticated ? 
-            <Navigate to="/medical-file-tracking" replace /> :
-            <Navigate to="/login" replace />
-          }
-        />
-      </Routes>
-    </Router>
+      {/* Protected Medical Routes */}
+      <Route 
+        path="/medical-file-tracking" 
+        element={
+          isMedicalAuthenticated ? 
+          <MedicalFileTracking /> : 
+          <Navigate to="/medical-login" replace />
+        } 
+      />
+
+      {/* Medical Access Portal (Public Route) */}
+      <Route 
+        path="/medical-access/:token" 
+        element={<MedicalAccess />} 
+      />
+      
+      {/* Default Redirect */}
+      <Route 
+        path="*" 
+        element={
+          isAuthenticated ? 
+          <Navigate to="/dashboard" replace /> : 
+          isEmployeeAuthenticated ? 
+          <Navigate to="/EmployeePortal" replace /> :
+          isMedicalAuthenticated ? 
+          <Navigate to="/medical-file-tracking" replace /> :
+          <Navigate to="/login" replace />
+        }
+      />
+    </Routes>
+  );
+}
+
+// Composant App principal avec AuthProvider
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
   );
 }
 

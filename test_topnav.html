@@ -3,9 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test TopNav - Basé sur AdminRh.php</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <title>Test TopNav - SIRH</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root {
+            --primary: #3a7bd5;
+            --primary-dark: #2c5aa0;
+            --primary-light: rgba(58, 123, 213, 0.1);
+            --white: #ffffff;
+            --gray: #6c757d;
+            --gray-light: #f8f9fa;
+            --dark: #343a40;
+            --danger: #dc3545;
+            --danger-light: rgba(220, 53, 69, 0.1);
+            --success: #28a745;
+            --success-light: rgba(40, 167, 69, 0.1);
+            --warning: #ffc107;
+            --warning-light: rgba(255, 193, 7, 0.1);
+            --info: #3298dc;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 8px rgba(0,0,0,0.15);
+            --transition-base: all 0.3s ease;
+            --topbar-height: 60px;
+            --gradient-primary: linear-gradient(135deg, #3a7bd5 0%, #2c5aa0 100%);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,14 +35,13 @@
         }
 
         body {
-            font-family: 'Poppins', sans-serif;
-            background-color: #f0f4f9;
-            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--gray-light);
         }
 
         .test-container {
             max-width: 1200px;
-            margin: 20px auto;
+            margin: 0 auto;
             padding: 20px;
         }
 
@@ -28,829 +49,239 @@
             text-align: center;
             margin-bottom: 30px;
             padding: 20px;
-            background: linear-gradient(135deg, #3a7bd5, #00d1b2);
-            color: white;
-            border-radius: 10px;
+            background: var(--white);
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
         }
 
-        /* TopNav Styles basés sur AdminRh.php */
-        .top-nav {
-            height: 65px;
-            background: white;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-            padding: 0 20px;
-            display: flex;
-            align-items: center;
-            position: relative;
-            z-index: 1020;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-
-        .toggle-sidebar {
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #eef5ff;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 1.1rem;
-            color: #3a7bd5;
-            transition: all 0.3s ease;
-            flex-shrink: 0;
-        }
-
-        .toggle-sidebar:hover {
-            background: #3a7bd5;
-            color: white;
-            transform: scale(1.05);
-        }
-
-        .top-nav-search {
-            position: relative;
-            max-width: 350px;
-            margin: 0 20px;
-            flex: 1;
-        }
-
-        .search-input {
-            width: 100%;
-            height: 40px;
-            padding: 10px 40px 10px 15px;
-            border: 1px solid rgba(0,0,0,0.1);
-            border-radius: 50px;
-            background: #f8fafd;
-            transition: all 0.3s ease;
-            font-size: 0.875rem;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #3a7bd5;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(58, 123, 213, 0.1);
-        }
-
-        .search-icon {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #3a7bd5;
-            pointer-events: none;
-        }
-
-        .top-nav-actions {
-            margin-left: auto;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .nav-action-btn {
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #eef5ff;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 1.1rem;
-            color: #3a7bd5;
-            position: relative;
-            transition: all 0.3s ease;
-            flex-shrink: 0;
-        }
-
-        .nav-action-btn:hover {
-            background: #3a7bd5;
-            color: white;
-            transform: translateY(-3px);
-        }
-
-        .notification-btn {
-            color: #ff9f43;
-            background: rgba(255, 159, 67, 0.15);
-        }
-
-        .notification-btn:hover {
-            background: #ff9f43;
-            color: white;
-        }
-
-        .message-btn {
-            color: #3298dc;
-            background: rgba(50, 152, 220, 0.15);
-        }
-
-        .message-btn:hover {
-            background: #3298dc;
-            color: white;
-        }
-
-        .badge-pill {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            height: 20px;
-            width: 20px;
-            line-height: 20px;
-            text-align: center;
-            background: #ff3860;
-            color: white;
-            font-size: 0.625rem;
-            font-weight: 600;
-            border-radius: 50%;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .user-profile {
-            display: flex;
-            align-items: center;
-            padding: 8px 12px;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background-color: #eef5ff;
-        }
-
-        .user-profile:hover {
-            background: #3a7bd5;
-            color: white;
-            transform: translateY(-3px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-        }
-
-        .user-profile:hover .user-name,
-        .user-profile:hover .user-title {
-            color: white;
-        }
-
-        .user-avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #3a7bd5, #00d1b2);
-            color: white;
-            font-weight: 600;
-            font-size: 0.9375rem;
-            margin-right: 10px;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.16);
-        }
-
-        .user-info {
-            display: flex;
-            flex-direction: column;
-            line-height: 1.2;
-        }
-
-        .user-name {
-            font-weight: 600;
-            font-size: 0.875rem;
-            color: #3a7bd5;
-            transition: all 0.3s ease;
-        }
-
-        .user-title {
-            font-size: 0.75rem;
-            color: #8c98a4;
-            transition: all 0.3s ease;
-        }
-
-        /* Dropdown Styles basés sur AdminRh.php */
-        .dropdown-menu {
-            position: absolute;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-            z-index: 1050;
-            display: none;
-            min-width: 280px;
-        }
-
-        .dropdown-menu.show {
-            display: block !important;
-        }
-
-        /* User Dropdown - basé sur AdminRh.php */
-        #userDropdown {
-            top: 70px;
-            right: 20px;
-            width: 280px;
-        }
-
-        #userDropdown .p-3 {
-            padding: 1rem !important;
-        }
-
-        #userDropdown .border-bottom {
-            border-bottom: 1px solid rgba(0,0,0,0.1) !important;
-        }
-
-        #userDropdown .dropdown-item {
-            padding: 0.5rem 1rem;
-            color: #333;
-            text-decoration: none;
-            display: block;
-            transition: all 0.3s ease;
-        }
-
-        #userDropdown .dropdown-item:hover {
-            background-color: #eef5ff;
-            color: #3a7bd5;
-        }
-
-        #userDropdown .dropdown-divider {
-            height: 1px;
-            background-color: rgba(0,0,0,0.1);
-            margin: 0.5rem 0;
-        }
-
-        #userDropdown .text-danger {
-            color: #ff3860 !important;
-        }
-
-        /* Notifications Dropdown - basé sur AdminRh.php */
-        #notificationDropdown {
-            top: 70px;
-            right: 75px;
-            width: 320px;
-        }
-
-        #notificationDropdown .bg-primary {
-            background-color: #3a7bd5 !important;
-        }
-
-        #notificationDropdown .dropdown-item {
-            padding: 0.5rem;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
-            text-decoration: none;
-            color: #333;
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-        }
-
-        #notificationDropdown .dropdown-item:hover {
-            background-color: #f8f9fa;
-        }
-
-        #notificationDropdown .dropdown-item:last-child {
-            border-bottom: none;
-        }
-
-        #notificationDropdown .bg-primary-light {
-            background-color: rgba(58, 123, 213, 0.1) !important;
-        }
-
-        #notificationDropdown .bg-success-light {
-            background-color: rgba(0, 209, 178, 0.1) !important;
-        }
-
-        #notificationDropdown .bg-warning-light {
-            background-color: rgba(255, 221, 87, 0.2) !important;
-        }
-
-        #notificationDropdown .text-primary {
-            color: #3a7bd5 !important;
-        }
-
-        #notificationDropdown .text-success {
-            color: #00d1b2 !important;
-        }
-
-        #notificationDropdown .text-warning {
-            color: #ff9f43 !important;
-        }
-
-        /* Message Box - basé sur AdminRh.php */
-        #messageBox {
-            position: fixed;
-            bottom: 20px;
-            right: -350px;
-            width: 350px;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-            transition: all 0.3s ease;
-            z-index: 1040;
-            overflow: hidden;
-        }
-
-        #messageBox.show {
-            right: 20px;
-        }
-
-        #messageBox .message-header {
-            background: linear-gradient(135deg, #3a7bd5, #00d1b2);
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        #messageBox .message-title {
-            font-weight: 600;
-            font-size: 1rem;
-            margin: 0;
-        }
-
-        #messageBox .message-refresh,
-        #messageBox .message-close {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-size: 1.1rem;
-            padding: 0;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #messageBox .message-refresh:hover {
-            transform: rotate(180deg);
-        }
-
-        #messageBox .message-body {
-            height: 250px;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        #messageBox .nav-tabs {
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-            padding: 0 15px;
-        }
-
-        #messageBox .nav-tabs .nav-link {
-            border: none;
-            color: #6c757d;
-            font-size: 0.85rem;
-            padding: 0.5rem 0.75rem;
-            margin-right: 0.5rem;
-            border-radius: 0;
-            transition: all 0.3s ease;
-        }
-
-        #messageBox .nav-tabs .nav-link:hover {
-            color: #3a7bd5;
-            background-color: transparent;
-            border-bottom: 2px solid rgba(58, 123, 213, 0.3);
-        }
-
-        #messageBox .nav-tabs .nav-link.active {
-            color: #3a7bd5;
-            font-weight: 600;
-            background-color: transparent;
-            border-bottom: 2px solid #3a7bd5;
-        }
-
-        #messageBox .tab-content {
-            padding-top: 10px;
-        }
-
-        #messageBox .email-list {
-            max-height: 210px;
-            overflow-y: auto;
-        }
-
-        #messageBox .email-item {
-            cursor: pointer;
-            transition: background-color 0.2s;
-            padding: 10px;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
-        }
-
-        #messageBox .email-item:hover {
-            background-color: rgba(58, 123, 213, 0.05);
-        }
-
-        #messageBox .email-item:last-child {
-            border-bottom: none;
-        }
-
-        #messageBox .message-form {
-            padding: 15px;
-            border-top: 1px solid rgba(0,0,0,0.05);
-        }
-
-        #messageBox .form-control {
-            border: 1px solid rgba(0,0,0,0.1);
-            border-radius: 20px;
-            padding: 8px 15px;
-            font-size: 0.875rem;
+        .test-title {
+            color: var(--primary);
             margin-bottom: 10px;
         }
 
-        #messageBox .form-control:focus {
-            outline: none;
-            border-color: #3a7bd5;
+        .test-description {
+            color: var(--gray);
+            font-size: 0.9rem;
         }
 
-        #messageBox .message-send {
-            width: 100%;
-            border-radius: 20px;
-            height: auto;
-            padding: 8px;
-            background: linear-gradient(135deg, #3a7bd5, #00d1b2);
-            color: white;
-            border: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        #messageBox .message-send:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-        }
-
-        /* Test buttons */
-        .test-buttons {
-            display: flex;
-            gap: 10px;
+        .test-section {
+            background: var(--white);
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
             margin-bottom: 20px;
-            flex-wrap: wrap;
-            justify-content: center;
+            overflow: hidden;
         }
 
-        .test-btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
+        .test-section-title {
+            padding: 15px 20px;
+            background: var(--primary-light);
+            color: var(--primary);
             font-weight: 600;
-            transition: all 0.3s ease;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
         }
 
-        .test-btn.primary { background: #3a7bd5; color: white; }
-        .test-btn.success { background: #00d1b2; color: white; }
-        .test-btn.warning { background: #ff9f43; color: white; }
-        .test-btn.danger { background: #ff3860; color: white; }
-
-        .test-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        .status-panel {
-            background: white;
+        .test-content {
             padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-            margin-bottom: 20px;
         }
 
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
+        .test-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 4px;
+            background: var(--gray-light);
         }
 
-        .status-item:last-child {
-            border-bottom: none;
+        .test-item:last-child {
+            margin-bottom: 0;
         }
 
-        .status-value {
+        .test-item-title {
             font-weight: 600;
-            color: #3a7bd5;
+            margin-bottom: 5px;
+            color: var(--dark);
+        }
+
+        .test-item-description {
+            font-size: 0.875rem;
+            color: var(--gray);
+        }
+
+        .status-success {
+            color: var(--success);
+        }
+
+        .status-warning {
+            color: var(--warning);
+        }
+
+        .status-error {
+            color: var(--danger);
         }
     </style>
 </head>
 <body>
     <div class="test-container">
         <div class="test-header">
-            <h1>🧪 Test de la TopNav - Basé sur AdminRh.php</h1>
-            <p>Interface de test pour vérifier le bon fonctionnement des trois boutons de la barre de navigation supérieure</p>
+            <h1 class="test-title">Test TopNav - Système SIRH</h1>
+            <p class="test-description">Vérification de la fonctionnalité complète de la barre de navigation supérieure</p>
         </div>
 
-        <div class="status-panel">
-            <h3>📊 État des composants :</h3>
-            <div class="status-item">
-                <span>Sidebar collapsed:</span>
-                <span class="status-value" id="sidebarStatus">Non</span>
+        <div class="test-section">
+            <div class="test-section-title">
+                <i class="fas fa-check-circle"></i> Fonctionnalités Testées
             </div>
-            <div class="status-item">
-                <span>Message box visible:</span>
-                <span class="status-value" id="messageStatus">Non</span>
-            </div>
-            <div class="status-item">
-                <span>User dropdown visible:</span>
-                <span class="status-value" id="userStatus">Non</span>
-            </div>
-            <div class="status-item">
-                <span>Notifications visible:</span>
-                <span class="status-value" id="notificationStatus">Non</span>
-            </div>
-        </div>
+            <div class="test-content">
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        <i class="fas fa-search"></i> Recherche Globale
+                    </div>
+                    <div class="test-item-description">
+                        Recherche d'employés, contrats et notes de service avec résultats en temps réel
+                    </div>
+                </div>
 
-        <div class="test-buttons">
-            <button class="test-btn primary" onclick="toggleSidebar()">
-                🔄 Toggle Sidebar
-            </button>
-            <button class="test-btn success" onclick="toggleMessageBox()">
-                💬 Toggle Message Box
-            </button>
-            <button class="test-btn warning" onclick="toggleUserDropdown()">
-                👤 Toggle User Dropdown
-            </button>
-            <button class="test-btn danger" onclick="toggleNotifications()">
-                🔔 Toggle Notifications
-            </button>
-        </div>
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        <i class="fas fa-bell"></i> Notifications
+                    </div>
+                    <div class="test-item-description">
+                        Système de notifications avec marquage lu/non-lu et navigation contextuelle
+                    </div>
+                </div>
 
-        <!-- TopNav basée sur AdminRh.php -->
-        <div class="top-nav">
-            <button class="toggle-sidebar" onclick="toggleSidebar()" title="Basculer la barre latérale">
-                <i class="fas fa-bars"></i>
-            </button>
-            
-            <div class="top-nav-search">
-                <input type="text" class="search-input" placeholder="Rechercher..." id="searchInput">
-                <i class="fas fa-search search-icon"></i>
-            </div>
-            
-            <div class="top-nav-actions">
-                <button 
-                    class="nav-action-btn notification-btn" 
-                    onclick="toggleNotifications()"
-                    title="Notifications"
-                >
-                    <i class="fas fa-bell"></i>
-                    <span class="badge-pill">3</span>
-                </button>
-                
-                <button 
-                    class="nav-action-btn message-btn" 
-                    onclick="toggleMessageBox()"
-                    title="Messages"
-                >
-                    <i class="fas fa-comments"></i>
-                    <span class="badge-pill">5</span>
-                </button>
-                
-                <div 
-                    class="user-profile" 
-                    onclick="toggleUserDropdown()"
-                    title="Menu utilisateur"
-                >
-                    <div class="user-avatar">RH</div>
-                    <div class="user-info">
-                        <div class="user-name">Admin RH</div>
-                        <div class="user-title">Administration</div>
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        <i class="fas fa-comments"></i> Messagerie
+                    </div>
+                    <div class="test-item-description">
+                        Interface de messagerie avec composition d'emails et gestion des messages
+                    </div>
+                </div>
+
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        <i class="fas fa-user"></i> Menu Utilisateur
+                    </div>
+                    <div class="test-item-description">
+                        Menu utilisateur avec profil, paramètres et déconnexion fonctionnelle
+                    </div>
+                </div>
+
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        <i class="fas fa-bars"></i> Toggle Sidebar
+                    </div>
+                    <div class="test-item-description">
+                        Bouton de basculement de la barre latérale avec gestion responsive
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- User Dropdown basé sur AdminRh.php -->
-        <div class="dropdown-menu" id="userDropdown">
-            <div class="p-3 border-bottom">
-                <div style="display: flex; align-items: center;">
-                    <div class="user-avatar" style="width: 48px; height: 48px; font-size: 1.125rem;">RH</div>
-                    <div style="margin-left: 15px;">
-                        <div style="font-weight: 600; font-size: 1rem;">Admin RH</div>
-                        <div style="color: #8c98a4; font-size: 0.875rem;">rh@centre-diagnostic.com</div>
+        <div class="test-section">
+            <div class="test-section-title">
+                <i class="fas fa-cogs"></i> Améliorations Apportées
+            </div>
+            <div class="test-content">
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        Gestion des Clics Extérieurs
+                    </div>
+                    <div class="test-item-description">
+                        Les dropdowns se ferment automatiquement lors d'un clic en dehors
+                    </div>
+                </div>
+
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        Service de Recherche
+                    </div>
+                    <div class="test-item-description">
+                        Service API dédié pour la recherche avec résultats filtrés par type
+                    </div>
+                </div>
+
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        Navigation Contextuelle
+                    </div>
+                    <div class="test-item-description">
+                        Navigation automatique vers les pages appropriées selon le type de résultat
+                    </div>
+                </div>
+
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        Design Responsive
+                    </div>
+                    <div class="test-item-description">
+                        Interface adaptative pour mobile et tablette avec gestion des espaces
+                    </div>
+                </div>
+
+                <div class="test-item">
+                    <div class="test-item-title status-success">
+                        États de Chargement
+                    </div>
+                    <div class="test-item-description">
+                        Indicateurs visuels de chargement pour une meilleure expérience utilisateur
                     </div>
                 </div>
             </div>
-            <a class="dropdown-item" href="mon_profil.php"><i class="fas fa-user-circle me-2"></i>Mon profil</a>
-            <a class="dropdown-item" href="parametres.php"><i class="fas fa-cog me-2"></i>Paramètres</a>
-            <div class="dropdown-divider"></div>
-            <a class="dropdown-item text-danger" href="index.php"><i class="fas fa-sign-out-alt me-2"></i>Déconnexion</a>
         </div>
 
-        <!-- Notifications Dropdown basé sur AdminRh.php -->
-        <div class="dropdown-menu" id="notificationDropdown">
-            <div class="p-3 bg-primary text-white">
-                <h6 style="margin: 0;">Notifications</h6>
+        <div class="test-section">
+            <div class="test-section-title">
+                <i class="fas fa-info-circle"></i> Instructions de Test
             </div>
-            <div class="p-2">
-                <a href="#" class="dropdown-item p-2 border-bottom d-flex align-items-center">
-                    <div class="me-3 bg-primary-light text-primary rounded-circle p-2">
-                        <i class="fas fa-user-plus"></i>
+            <div class="test-content">
+                <div class="test-item">
+                    <div class="test-item-title">
+                        1. Test de la Recherche
                     </div>
-                    <div>
-                        <p style="margin: 0; font-weight: 500;">Nouvelle demande de congé</p>
-                        <p style="margin: 0; font-size: 0.75rem; color: #8c98a4;">Il y a 30 minutes</p>
+                    <div class="test-item-description">
+                        Tapez "Jean" ou "contrat" dans la barre de recherche pour voir les résultats
                     </div>
-                </a>
-                <a href="#" class="dropdown-item p-2 border-bottom d-flex align-items-center">
-                    <div class="me-3 bg-success-light text-success rounded-circle p-2">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div>
-                        <p style="margin: 0; font-weight: 500;">Rapport mensuel généré</p>
-                        <p style="margin: 0; font-size: 0.75rem; color: #8c98a4;">Il y a 2 heures</p>
-                    </div>
-                </a>
-                <a href="#" class="dropdown-item p-2 d-flex align-items-center">
-                    <div class="me-3 bg-warning-light text-warning rounded-circle p-2">
-                        <i class="fas fa-exclamation-triangle"></i>
-                    </div>
-                    <div>
-                        <p style="margin: 0; font-weight: 500;">Mise à jour du système</p>
-                        <p style="margin: 0; font-size: 0.75rem; color: #8c98a4;">Il y a 1 jour</p>
-                    </div>
-                </a>
-            </div>
-            <div class="p-2 border-top">
-                <a href="#" class="dropdown-item text-center small text-primary p-2">Voir toutes les notifications</a>
-            </div>
-        </div>
+                </div>
 
-        <!-- Message Box basé sur AdminRh.php -->
-        <div class="dropdown-menu" id="messageBox">
-            <div class="message-header">
-                <h5 class="message-title">Messagerie Gmail</h5>
-                <button class="message-refresh" id="refreshGmail">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
-                <button class="message-close" id="closeMessage">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="message-body">
-                <div class="text-center py-4">
-                    <i class="fas fa-envelope-open-text fa-3x text-muted mb-3"></i>
-                    <p>Connectez-vous à votre compte Gmail pour accéder à vos emails.</p>
-                    <button class="test-btn success" style="margin-top: 15px;">
-                        <i class="fab fa-google" style="margin-right: 8px;"></i>
-                        Se connecter à Gmail
-                    </button>
+                <div class="test-item">
+                    <div class="test-item-title">
+                        2. Test des Notifications
+                    </div>
+                    <div class="test-item-description">
+                        Cliquez sur l'icône de cloche pour ouvrir les notifications et tester les actions
+                    </div>
+                </div>
+
+                <div class="test-item">
+                    <div class="test-item-title">
+                        3. Test de la Messagerie
+                    </div>
+                    <div class="test-item-description">
+                        Cliquez sur l'icône de messages pour tester la composition d'emails
+                    </div>
+                </div>
+
+                <div class="test-item">
+                    <div class="test-item-title">
+                        4. Test du Menu Utilisateur
+                    </div>
+                    <div class="test-item-description">
+                        Cliquez sur le profil utilisateur pour tester la déconnexion et les liens
+                    </div>
+                </div>
+
+                <div class="test-item">
+                    <div class="test-item-title">
+                        5. Test Responsive
+                    </div>
+                    <div class="test-item-description">
+                        Redimensionnez la fenêtre pour tester l'adaptation mobile
+                    </div>
                 </div>
             </div>
-            
-            <div class="message-form">
-                <form>
-                    <input type="email" class="form-control" placeholder="Destinataire" required>
-                    <input type="text" class="form-control" placeholder="Objet" required>
-                    <textarea class="form-control" rows="3" placeholder="Votre message..." required></textarea>
-                    <button type="submit" class="message-send">
-                        <i class="fas fa-paper-plane me-2"></i> Envoyer
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <div class="status-panel">
-            <h3>📝 Instructions de test :</h3>
-            <ol style="padding-left: 20px; line-height: 1.6;">
-                <li><strong>Cliquez sur les boutons de test</strong> pour voir les états changer</li>
-                <li><strong>Cliquez sur les éléments de la TopNav</strong> pour tester les interactions</li>
-                <li><strong>Utilisez la barre de recherche</strong> pour tester le focus/blur</li>
-                <li><strong>Vérifiez la responsivité</strong> en redimensionnant la fenêtre</li>
-            </ol>
         </div>
     </div>
-
-    <script>
-        // Variables globales
-        let sidebarCollapsed = false;
-        let showMessageBox = false;
-        let showUserDropdown = false;
-        let showNotifications = false;
-
-        // Fonction de mise à jour du statut
-        function updateStatus() {
-            const sidebarStatus = document.getElementById('sidebarStatus');
-            const messageStatus = document.getElementById('messageStatus');
-            const userStatus = document.getElementById('userStatus');
-            const notificationStatus = document.getElementById('notificationStatus');
-            
-            if (sidebarStatus) sidebarStatus.textContent = sidebarCollapsed ? 'Oui' : 'Non';
-            if (messageStatus) messageStatus.textContent = showMessageBox ? 'Oui' : 'Non';
-            if (userStatus) userStatus.textContent = showUserDropdown ? 'Oui' : 'Non';
-            if (notificationStatus) notificationStatus.textContent = showNotifications ? 'Oui' : 'Non';
-        }
-
-        // Fonction toggle sidebar
-        function toggleSidebar() {
-            sidebarCollapsed = !sidebarCollapsed;
-            console.log('Sidebar toggled:', sidebarCollapsed);
-            updateStatus();
-        }
-
-        // Fonction toggle message box
-        function toggleMessageBox() {
-            showMessageBox = !showMessageBox;
-            showUserDropdown = false;
-            showNotifications = false;
-            
-            const messageBox = document.getElementById('messageBox');
-            const userDropdown = document.getElementById('userDropdown');
-            const notificationDropdown = document.getElementById('notificationDropdown');
-            
-            if (showMessageBox) {
-                if (messageBox) messageBox.classList.add('show');
-                if (userDropdown) userDropdown.classList.remove('show');
-                if (notificationDropdown) notificationDropdown.classList.remove('show');
-            } else {
-                if (messageBox) messageBox.classList.remove('show');
-            }
-            
-            console.log('Message box toggled:', showMessageBox);
-            updateStatus();
-        }
-
-        // Fonction toggle user dropdown
-        function toggleUserDropdown() {
-            showUserDropdown = !showUserDropdown;
-            showMessageBox = false;
-            showNotifications = false;
-            
-            const userDropdown = document.getElementById('userDropdown');
-            const messageBox = document.getElementById('messageBox');
-            const notificationDropdown = document.getElementById('notificationDropdown');
-            
-            if (showUserDropdown) {
-                if (userDropdown) userDropdown.classList.add('show');
-                if (messageBox) messageBox.classList.remove('show');
-                if (notificationDropdown) notificationDropdown.classList.remove('show');
-            } else {
-                if (userDropdown) userDropdown.classList.remove('show');
-            }
-            
-            console.log('User dropdown toggled:', showUserDropdown);
-            updateStatus();
-        }
-
-        // Fonction toggle notifications
-        function toggleNotifications() {
-            showNotifications = !showNotifications;
-            showMessageBox = false;
-            showUserDropdown = false;
-            
-            const notificationDropdown = document.getElementById('notificationDropdown');
-            const messageBox = document.getElementById('messageBox');
-            const userDropdown = document.getElementById('userDropdown');
-            
-            if (showNotifications) {
-                if (notificationDropdown) notificationDropdown.classList.add('show');
-                if (messageBox) messageBox.classList.remove('show');
-                if (userDropdown) userDropdown.classList.remove('show');
-            } else {
-                if (notificationDropdown) notificationDropdown.classList.remove('show');
-            }
-            
-            console.log('Notifications toggled:', showNotifications);
-            updateStatus();
-        }
-
-        // Fermer les dropdowns en cliquant à l'extérieur
-        document.addEventListener('click', function(event) {
-            if (!event.target.closest('.top-nav-actions') && !event.target.closest('.dropdown-menu')) {
-                showMessageBox = false;
-                showUserDropdown = false;
-                showNotifications = false;
-                
-                const messageBox = document.getElementById('messageBox');
-                const userDropdown = document.getElementById('userDropdown');
-                const notificationDropdown = document.getElementById('notificationDropdown');
-                
-                if (messageBox) messageBox.classList.remove('show');
-                if (userDropdown) userDropdown.classList.remove('show');
-                if (notificationDropdown) notificationDropdown.classList.remove('show');
-                
-                updateStatus();
-            }
-        });
-
-        // Initialisation au chargement de la page
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, initializing TopNav test...');
-            updateStatus();
-            console.log('TopNav test script initialized successfully');
-        });
-
-        // Fallback si DOMContentLoaded n'est pas déclenché
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function() {
-                console.log('DOM loaded via fallback');
-            });
-        } else {
-            console.log('DOM already loaded, initializing immediately');
-            updateStatus();
-        }
-    </script>
 </body>
 </html>

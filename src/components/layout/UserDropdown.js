@@ -1,6 +1,9 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const UserDropdown = ({ user, onLogout }) => {
+  const navigate = useNavigate();
+
   const getInitials = (name) => {
     if (!name || typeof name !== 'string') return 'RH';
     return name
@@ -15,6 +18,23 @@ const UserDropdown = ({ user, onLogout }) => {
   const userRole = user?.role || user?.poste || user?.fonction || 'Administration';
   const userEmail = user?.email || 'admin@centre-diagnostic.com';
 
+  const handleProfileClick = (e) => {
+    e.preventDefault();
+    navigate('/profile');
+  };
+
+  const handleSettingsClick = (e) => {
+    e.preventDefault();
+    navigate('/settings');
+  };
+
+  const handleLogoutClick = (e) => {
+    e.preventDefault();
+    if (onLogout) {
+      onLogout();
+    }
+  };
+
   return (
     <div className="dropdown-menu user-dropdown">
       <div className="user-dropdown-header">
@@ -25,23 +45,28 @@ const UserDropdown = ({ user, onLogout }) => {
           <div className="user-details">
             <div className="user-name">{userName}</div>
             <div className="user-role">{userRole}</div>
+            <div className="user-email">{userEmail}</div>
           </div>
         </div>
       </div>
       
       <div className="dropdown-menu-items">
-        <a href="/mon-profil" className="dropdown-item">
+        <a href="/profile" className="dropdown-item" onClick={handleProfileClick}>
           <i className="fas fa-user-circle"></i>
-          Mon profil
+          <span>Mon profil</span>
         </a>
-        <a href="/parametres" className="dropdown-item">
+        <a href="/settings" className="dropdown-item" onClick={handleSettingsClick}>
           <i className="fas fa-cog"></i>
-          Paramètres
+          <span>Paramètres</span>
+        </a>
+        <a href="/help" className="dropdown-item">
+          <i className="fas fa-question-circle"></i>
+          <span>Aide</span>
         </a>
         <div className="dropdown-divider"></div>
-        <button onClick={onLogout} className="dropdown-item text-danger">
+        <button onClick={handleLogoutClick} className="dropdown-item text-danger">
           <i className="fas fa-sign-out-alt"></i>
-          Déconnexion
+          <span>Déconnexion</span>
         </button>
       </div>
     </div>

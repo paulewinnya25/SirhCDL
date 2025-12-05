@@ -55,7 +55,7 @@ const offboardingRoutes = (pool) => {
       const offboardingData = JSON.parse(req.body.offboardingData);
       const documents = req.files || [];
       
-      // Vérifier si l'employé existe et est actif
+      // Vérifier si l'employé existe et est actif (pas déjà partant)
       const employeeResult = await client.query(
         'SELECT * FROM employees WHERE id = $1 AND statut = $2',
         [offboardingData.employee_id, 'Actif']
@@ -71,7 +71,7 @@ const offboardingRoutes = (pool) => {
 
       const employee = employeeResult.rows[0];
 
-      // Supprimer l'employé de l'effectif (table employees)
+      // Supprimer l'employé de la table employees
       await client.query(
         'DELETE FROM employees WHERE id = $1',
         [offboardingData.employee_id]
@@ -125,7 +125,7 @@ const offboardingRoutes = (pool) => {
       ]);
 
       // Mettre à jour l'historique de recrutement pour marquer la fin
-      const newNotes = `Départ le ${offboardingData.date_depart} (${offboardingData.motif_depart || 'Départ'})`;
+      const newNotes = `Départ le ${offboardingData.date_depart} (${offboardingData.motif_depart || 'Départ'}) - Employé supprimé`;
       
       await client.query(`
         UPDATE recrutement_history 

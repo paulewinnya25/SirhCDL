@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Alert, Card, Badge, Table, Modal, Spinner } from 'react-bootstrap';
-import axios from 'axios';
+import procedureService from '../../services/procedureService';
 import '../../styles/ProcedureTracking.css';
 
 const ProcedureTracking = () => {
@@ -98,279 +98,91 @@ const ProcedureTracking = () => {
     'authentification': {
       'diplome_authentifie': 'Diplômes authentifiés par l\'ambassade',
       'attestation_ambassade': 'Attestation d\'authentification',
-      'traduction_officielle': 'Traduction officielle (si nécessaire)'
+      'engagement_rapatriement': 'Engagement de rapatriement'
     },
     'homologation': {
-      'diplome_legalise': 'Diplômes légalisés par l\'UOB',
-      'diplome_legalise_mae': 'Diplômes légalisés par le MAE',
-      'dossier_homologation': 'Dossier complet de demande d\'homologation'
+      'demande_homologation': 'Demande d\'homologation complète',
+      'attestation_homologation': 'Attestation d\'homologation',
+      'certificat_competence': 'Certificat de compétence'
     },
     'cnom': {
-      'attestation_homologation': 'Attestation d\'homologation',
-      'dossier_cnom': 'Dossier d\'enregistrement CNOM',
-      'serment_hippocrate': 'Serment d\'Hippocrate'
+      'inscription_cnom': 'Inscription au CNOM',
+      'carte_professionnelle': 'Carte professionnelle',
+      'attestation_inscription': 'Attestation d\'inscription'
     },
     'autorisation_exercer': {
-      'numero_cnom': 'Numéro d\'enregistrement CNOM',
-      'certificat_medical': 'Certificat médical de moins de 3 mois',
-      'casier_judiciaire': 'Extrait de casier judiciaire',
-      'photos_identite': 'Photos d\'identité récentes'
+      'autorisation_exercer': 'Autorisation d\'exercer',
+      'certificat_formation': 'Certificat de formation continue'
     },
     'autorisation_travail': {
-      'autorisation_exercer': 'Autorisation d\'exercer délivrée',
-      'contrat_travail': 'Contrat de travail signé',
-      'certificat_hebergement': 'Certificat d\'hébergement',
-      'engagement_rapatriement': 'Engagement de rapatriement'
+      'autorisation_travail': 'Autorisation de travail',
+      'carte_sejour': 'Carte de séjour',
+      'contrat_travail': 'Contrat de travail'
     }
   };
 
-  // Simuler le chargement des données du serveur
+  // Charger les données depuis la base de données
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Dans une véritable application, ceci serait remplacé par des appels d'API
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simuler un délai réseau
-
-        // Données fictives pour simulation
-        const mockDossiers = [
-          {
-            id: '1',
-            nom: 'Dupont',
-            prenom: 'Jean',
-            email: 'jean.dupont@example.com',
-            telephone: '+33 6 12 34 56 78',
-            nationalite: 'Française',
-            specialite: 'Cardiologie',
-            universite: 'Université Paris Descartes',
-            diplome_pays: 'France',
-            statut: 'authentification',
-            date_creation: '2025-06-15',
-            derniere_modification: '2025-06-17'
-          },
-          {
-            id: '2',
-            nom: 'Smith',
-            prenom: 'John',
-            email: 'john.smith@example.com',
-            telephone: '+44 7911 123456',
-            nationalite: 'Britannique',
-            specialite: 'Neurologie',
-            universite: 'Imperial College London',
-            diplome_pays: 'Royaume-Uni',
-            statut: 'homologation',
-            date_creation: '2025-06-10',
-            derniere_modification: '2025-06-16'
-          },
-          {
-            id: '3',
-            nom: 'Diallo',
-            prenom: 'Mamadou',
-            email: 'mamadou.diallo@example.com',
-            telephone: '+221 77 123 45 67',
-            nationalite: 'Sénégalaise',
-            specialite: 'Pédiatrie',
-            universite: 'Université Cheikh Anta Diop',
-            diplome_pays: 'Sénégal',
-            statut: 'nouveau',
-            date_creation: '2025-06-20',
-            derniere_modification: '2025-06-20'
-          },
-          {
-            id: '4',
-            nom: 'Morin',
-            prenom: 'Sophie',
-            email: 'sophie.morin@example.com',
-            telephone: '+33 6 98 76 54 32',
-            nationalite: 'Française',
-            specialite: 'Radiologie',
-            universite: 'Université Lyon 1',
-            diplome_pays: 'France',
-            statut: 'autorisation_travail',
-            date_creation: '2025-05-05',
-            derniere_modification: '2025-06-18'
-          }
-        ];
-
-        // Stats fictives
-        const mockStats = {
-          total: mockDossiers.length,
-          nouveau: mockDossiers.filter(d => d.statut === 'nouveau').length,
-          en_cours: mockDossiers.filter(d => ['authentification', 'homologation', 'cnom', 'autorisation_exercer'].includes(d.statut)).length,
-          complete: mockDossiers.filter(d => d.statut === 'autorisation_travail').length
-        };
-
-        // Simuler les nouveaux dossiers (dans les dernières 24h)
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const nouveauxCount = mockDossiers.filter(d => new Date(d.date_creation) > yesterday).length;
-
+        // Récupérer les dossiers avec filtres
+        const dossiersResponse = await procedureService.getAllDossiers({
+          search,
+          status: statusFilter,
+          specialite: specialiteFilter,
+          sort,
+          order,
+          page: 1,
+          limit: 100
+        });
+        
+        setDossiers(dossiersResponse.dossiers || []);
+        
+        // Récupérer les statistiques
+        const statsResponse = await procedureService.getStatistiques();
+        setStats({
+          total: statsResponse.total || 0,
+          nouveau: statsResponse.nouveaux || 0,
+          en_cours: statsResponse.en_cours || 0,
+          complete: statsResponse.completes || 0
+        });
+        
         // Extraire les spécialités uniques
-        const uniqueSpecialites = [...new Set(mockDossiers.map(d => d.specialite))];
-
-        // Mettre à jour les états
-        setDossiers(mockDossiers);
-        setStats(mockStats);
-        setNouveauxDossiers(nouveauxCount);
-        setSpecialites(uniqueSpecialites);
+        const specialitesUniques = [...new Set(dossiersResponse.dossiers.map(d => d.specialite).filter(Boolean))];
+        setSpecialites(specialitesUniques);
+        
+        // Compter les nouveaux dossiers (créés aujourd'hui)
+        const aujourdhui = new Date().toISOString().split('T')[0];
+        const nouveauxAujourdhui = dossiersResponse.dossiers.filter(d => 
+          d.date_creation && d.date_creation.startsWith(aujourdhui)
+        ).length;
+        setNouveauxDossiers(nouveauxAujourdhui);
+        
       } catch (error) {
-        console.error("Erreur lors du chargement des données:", error);
-        setErrorMessage("Une erreur est survenue lors du chargement des données. Veuillez réessayer.");
+        console.error('Erreur lors du chargement des données:', error);
+        setErrorMessage('Erreur lors du chargement des données. Veuillez réessayer.');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [search, statusFilter, specialiteFilter, sort, order]);
 
-  // Filtrer les dossiers en fonction des critères
-  const filteredDossiers = dossiers.filter(dossier => {
-    const matchesSearch = !search || 
-      dossier.nom.toLowerCase().includes(search.toLowerCase()) ||
-      dossier.prenom.toLowerCase().includes(search.toLowerCase()) ||
-      dossier.email.toLowerCase().includes(search.toLowerCase()) ||
-      dossier.specialite.toLowerCase().includes(search.toLowerCase());
-    
-    const matchesStatus = !statusFilter || dossier.statut === statusFilter;
-    
-    const matchesSpecialite = !specialiteFilter || dossier.specialite === specialiteFilter;
-    
-    return matchesSearch && matchesStatus && matchesSpecialite;
-  });
-
-  // Trier les dossiers
-  const sortedDossiers = [...filteredDossiers].sort((a, b) => {
-    let valueA = a[sort];
-    let valueB = b[sort];
-
-    // Pour les chaînes, convertir en minuscules pour un tri insensible à la casse
-    if (typeof valueA === 'string') valueA = valueA.toLowerCase();
-    if (typeof valueB === 'string') valueB = valueB.toLowerCase();
-
-    if (order === 'ASC') {
-      return valueA > valueB ? 1 : -1;
-    } else {
-      return valueA < valueB ? 1 : -1;
-    }
-  });
-
-  // Vérifier si un dossier a été créé dans les dernières 24h
-  const isNewDossier = (dateCreation) => {
-    const now = new Date();
-    const creationDate = new Date(dateCreation);
-    const diffTime = Math.abs(now - creationDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays <= 1;
-  };
-
-  // Fonction pour gérer le changement d'ordre de tri
-  const handleSortChange = (column) => {
-    if (sort === column) {
-      setOrder(order === 'ASC' ? 'DESC' : 'ASC');
-    } else {
-      setSort(column);
-      setOrder('ASC');
-    }
-  };
-
-  // Simuler l'ajout d'un commentaire
-  const handleAddComment = () => {
-    if (!commentaire.trim()) {
-      setErrorMessage("Le commentaire ne peut pas être vide.");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    // Simuler un appel API
-    setTimeout(() => {
-      console.log("Commentaire ajouté:", {
-        dossier_id: selectedDossier.id,
-        etape: "commentaire_general",
-        commentaire: commentaire
-      });
-      
-      setIsSubmitting(false);
-      setCommentaire('');
-      setShowCommentModal(false);
-      setSuccessMessage("Commentaire ajouté avec succès");
-      
-      // Effacer le message après 5 secondes
-      setTimeout(() => setSuccessMessage(''), 5000);
-    }, 1000);
-  };
-
-  // Simuler la suppression d'un dossier
-  const handleDeleteDossier = () => {
-    setIsSubmitting(true);
-
-    // Simuler un appel API
-    setTimeout(() => {
-      const updatedDossiers = dossiers.filter(d => d.id !== selectedDossier.id);
-      
-      setDossiers(updatedDossiers);
-      setIsSubmitting(false);
-      setShowDeleteModal(false);
-      setSuccessMessage("Dossier supprimé avec succès");
-      
-      // Mettre à jour les statistiques
-      setStats({
-        total: updatedDossiers.length,
-        nouveau: updatedDossiers.filter(d => d.statut === 'nouveau').length,
-        en_cours: updatedDossiers.filter(d => ['authentification', 'homologation', 'cnom', 'autorisation_exercer'].includes(d.statut)).length,
-        complete: updatedDossiers.filter(d => d.statut === 'autorisation_travail').length
-      });
-      
-      // Effacer le message après 5 secondes
-      setTimeout(() => setSuccessMessage(''), 5000);
-    }, 1000);
-  };
-
-  // Simuler la création d'un nouveau dossier
-  const handleCreateDossier = (e) => {
-    e.preventDefault();
-    
-    // Validation basique
-    if (!newDossierData.nom || !newDossierData.prenom || !newDossierData.email || !newDossierData.specialite) {
-      setErrorMessage("Veuillez remplir tous les champs obligatoires.");
-      return;
-    }
-    
-    if (!confirmEnvoi) {
-      setErrorMessage("Veuillez confirmer la création du dossier.");
-      return;
-    }
-    
+  // Gérer la création d'un nouveau dossier
+  const handleCreateDossier = async () => {
     setIsSubmitting(true);
     setErrorMessage('');
+    setSuccessMessage('');
 
-    // Simuler un appel API
-    setTimeout(() => {
-      // Créer un nouvel ID fictif
-      const newId = (Math.max(...dossiers.map(d => parseInt(d.id))) + 1).toString();
+    try {
+      const response = await procedureService.createDossier(newDossierData);
       
-      // Créer un nouveau dossier
-      const newDossier = {
-        id: newId,
-        ...newDossierData,
-        statut: 'nouveau',
-        date_creation: new Date().toISOString().split('T')[0],
-        derniere_modification: new Date().toISOString().split('T')[0]
-      };
-      
-      // Mettre à jour l'état
-      const updatedDossiers = [...dossiers, newDossier];
-      setDossiers(updatedDossiers);
-      
-      // Générer un lien d'accès fictif
-      const accessToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const lienAcces = `https://centre-diagnostic.com/acces_dossier.php?token=${accessToken}`;
-      
-      // Mettre à jour les états pour afficher le lien
-      setLienAccesGenere(lienAcces);
-      setNomMedecin(`${newDossierData.prenom} ${newDossierData.nom}`);
-      setEmailMedecin(newDossierData.email);
+      setSuccessMessage(`Dossier créé avec succès pour ${response.dossier.nom} ${response.dossier.prenom}`);
+      setLienAccesGenere(response.dossier.lien_acces);
+      setNomMedecin(`${response.dossier.nom} ${response.dossier.prenom}`);
+      setEmailMedecin(response.dossier.email);
       
       // Réinitialiser le formulaire
       setNewDossierData({
@@ -383,406 +195,314 @@ const ProcedureTracking = () => {
         universite: '',
         diplome_pays: ''
       });
-      setConfirmEnvoi(false);
       
-      // Fermer la modale
+      // Fermer la modale et recharger les données
       setShowCreateModal(false);
-      
-      // Mettre à jour les statistiques
-      setStats({
-        total: updatedDossiers.length,
-        nouveau: updatedDossiers.filter(d => d.statut === 'nouveau').length,
-        en_cours: updatedDossiers.filter(d => ['authentification', 'homologation', 'cnom', 'autorisation_exercer'].includes(d.statut)).length,
-        complete: updatedDossiers.filter(d => d.statut === 'autorisation_travail').length
-      });
-      
-      setSuccessMessage("Dossier créé avec succès et email envoyé au médecin.");
-      setIsSubmitting(false);
-      
-      // Effacer le lien après 1 minute
       setTimeout(() => {
-        setLienAccesGenere('');
-        setNomMedecin('');
-        setEmailMedecin('');
-      }, 60000);
-    }, 1500);
-  };
-
-  // Simuler le renvoi d'un lien d'accès
-  const handleResendLink = () => {
-    if (!confirmRenvoi) {
-      setErrorMessage("Veuillez confirmer l'envoi du nouveau lien d'accès.");
-      return;
-    }
-    
-    setIsSubmitting(true);
-    setErrorMessage('');
-
-    // Simuler un appel API
-    setTimeout(() => {
-      // Générer un nouveau token fictif
-      const accessToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        window.location.reload();
+      }, 2000);
       
-      console.log("Nouveau lien d'accès généré pour:", selectedDossier.id);
-      
+    } catch (error) {
+      console.error('Erreur lors de la création du dossier:', error);
+      setErrorMessage(error.response?.data?.error || 'Erreur lors de la création du dossier');
+    } finally {
       setIsSubmitting(false);
-      setConfirmRenvoi(false);
-      setShowResendLinkModal(false);
-      setSuccessMessage(`Un nouveau lien d'accès a été envoyé à ${selectedDossier.email}`);
-      
-      // Effacer le message après 5 secondes
-      setTimeout(() => setSuccessMessage(''), 5000);
-    }, 1000);
+    }
   };
 
-  // Fonction pour copier le lien d'accès
-  const copyLien = () => {
-    navigator.clipboard.writeText(lienAccesGenere)
-      .then(() => {
-        const copyBtn = document.querySelector('.copy-btn');
-        if (copyBtn) {
-          const originalText = copyBtn.innerHTML;
-          copyBtn.innerHTML = '<i class="fas fa-check me-1"></i>Copié!';
-          copyBtn.classList.remove('btn-outline-primary');
-          copyBtn.classList.add('btn-success');
-          
-          setTimeout(() => {
-            copyBtn.innerHTML = originalText;
-            copyBtn.classList.remove('btn-success');
-            copyBtn.classList.add('btn-outline-primary');
-          }, 1500);
-        }
-      })
-      .catch(err => {
-        console.error('Erreur lors de la copie:', err);
-        setErrorMessage('Erreur lors de la copie du lien');
+  // Gérer l'ajout d'un commentaire
+  const handleAddCommentaire = async () => {
+    if (!commentaire.trim() || !selectedDossier) return;
+
+    try {
+      await procedureService.addCommentaire(selectedDossier.id, {
+        commentaire: commentaire.trim(),
+        type: 'note',
+        admin_id: 1 // ID de l'admin connecté (à adapter selon votre système d'auth)
       });
+      
+      setSuccessMessage('Commentaire ajouté avec succès');
+      setCommentaire('');
+      setShowCommentModal(false);
+      
+      // Recharger les données
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout du commentaire:', error);
+      setErrorMessage('Erreur lors de l\'ajout du commentaire');
+    }
   };
 
-  // Fonction pour afficher les détails du dossier
-  const viewDossier = (id) => {
-    // Dans une application réelle, ceci redirigerait vers une page de détails
-    console.log("Affichage des détails pour le dossier:", id);
-    window.alert(`Cette fonction ouvrirait la page de détails du dossier #${id} dans une application réelle.`);
+  // Gérer la suppression d'un dossier
+  const handleDeleteDossier = async () => {
+    if (!selectedDossier) return;
+
+    try {
+      await procedureService.deleteDossier(selectedDossier.id);
+      
+      setSuccessMessage('Dossier supprimé avec succès');
+      setShowDeleteModal(false);
+      setSelectedDossier(null);
+      
+      // Recharger les données
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('Erreur lors de la suppression du dossier:', error);
+      setErrorMessage('Erreur lors de la suppression du dossier');
+    }
   };
 
-  // Fonction pour exporter les données en CSV
-  const exportToCSV = () => {
-    // Préparer les données
-    const headers = ['ID', 'Nom', 'Email', 'Spécialité', 'Statut', 'Date de création'];
-    
-    const data = sortedDossiers.map(dossier => [
-      dossier.id,
-      `${dossier.prenom} ${dossier.nom}`,
-      dossier.email,
-      dossier.specialite,
-      etapesInfo[dossier.statut].titre,
-      new Date(dossier.date_creation).toLocaleDateString('fr-FR')
-    ]);
-    
-    // Convertir en format CSV
-    let csvContent = headers.join(',') + '\n';
-    data.forEach(row => {
-      csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+  // Gérer le renvoi du lien d'accès
+  const handleResendLink = async () => {
+    if (!selectedDossier) return;
+
+    try {
+      const response = await procedureService.renvoyerLien(selectedDossier.id);
+      
+      setSuccessMessage('Nouveau lien d\'accès généré et envoyé');
+      setLienAccesGenere(response.lien);
+      setNomMedecin(`${selectedDossier.nom} ${selectedDossier.prenom}`);
+      setEmailMedecin(selectedDossier.email);
+      setShowResendLinkModal(false);
+      
+    } catch (error) {
+      console.error('Erreur lors du renvoi du lien:', error);
+      setErrorMessage('Erreur lors du renvoi du lien d\'accès');
+    }
+  };
+
+  // Gérer le changement de statut
+  const handleStatusChange = async (dossierId, newStatus) => {
+    try {
+      await procedureService.updateDossier(dossierId, { statut: newStatus });
+      setSuccessMessage('Statut mis à jour avec succès');
+      
+      // Recharger les données
+      window.location.reload();
+      
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut:', error);
+      setErrorMessage('Erreur lors de la mise à jour du statut');
+    }
+  };
+
+  // Formater la date
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
     });
-    
-    // Créer un blob et télécharger
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    
-    // Préparer le téléchargement
-    link.setAttribute('href', url);
-    link.setAttribute('download', `dossiers_medicaux_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    
-    // Déclencher le téléchargement
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    setSuccessMessage('Export CSV réalisé avec succès');
-    setTimeout(() => setSuccessMessage(''), 3000);
   };
+
+  // Obtenir la couleur du badge selon le statut
+  const getStatusBadgeColor = (statut) => {
+    return etapesInfo[statut]?.couleur || 'secondary';
+  };
+
+  // Obtenir le titre du statut
+  const getStatusTitle = (statut) => {
+    return etapesInfo[statut]?.titre || statut;
+  };
+
+  // Filtrer les dossiers
+  const filteredDossiers = dossiers.filter(dossier => {
+    const matchesSearch = !search || 
+      dossier.nom?.toLowerCase().includes(search.toLowerCase()) ||
+      dossier.prenom?.toLowerCase().includes(search.toLowerCase()) ||
+      dossier.email?.toLowerCase().includes(search.toLowerCase()) ||
+      dossier.specialite?.toLowerCase().includes(search.toLowerCase());
+    
+    const matchesStatus = !statusFilter || dossier.statut === statusFilter;
+    const matchesSpecialite = !specialiteFilter || dossier.specialite === specialiteFilter;
+    
+    return matchesSearch && matchesStatus && matchesSpecialite;
+  });
 
   return (
-    <div className="procedure-tracking-container">
-      {/* Titre de la page */}
-      <div className="page-title-wrapper">
-        <h1 className="page-title">Suivi des Procédures Médicales</h1>
-        <p className="page-subtitle">
-          Gérez les dossiers d'homologation et les autorisations d'exercer des médecins
-        </p>
-      </div>
-
+    <div className="container-fluid">
       {/* Messages de succès et d'erreur */}
       {successMessage && (
         <Alert variant="success" dismissible onClose={() => setSuccessMessage('')}>
-          <i className="fas fa-check-circle me-2"></i>{successMessage}
+          {successMessage}
         </Alert>
       )}
-
+      
       {errorMessage && (
         <Alert variant="danger" dismissible onClose={() => setErrorMessage('')}>
-          <i className="fas fa-exclamation-triangle me-2"></i>{errorMessage}
+          {errorMessage}
         </Alert>
       )}
 
-      {/* Lien d'accès généré */}
-      {lienAccesGenere && (
-        <Alert variant="info" dismissible onClose={() => {
-          setLienAccesGenere('');
-          setNomMedecin('');
-          setEmailMedecin('');
-        }}>
-          <h5><i className="fas fa-link me-2"></i>Lien d'accès généré pour Dr. {nomMedecin}</h5>
-          <p>Email: {emailMedecin}</p>
-          <div className="input-group mb-2">
-            <Form.Control
-              type="text"
-              value={lienAccesGenere}
-              readOnly
-              id="lien_acces"
-            />
-            <Button 
-              variant="outline-primary" 
-              className="copy-btn"
-              onClick={copyLien}
-            >
-              <i className="fas fa-copy me-1"></i>Copier
-            </Button>
-          </div>
-          <p className="mb-0">
-            <Button 
-              variant="primary" 
-              size="sm" 
-              href={lienAccesGenere} 
-              target="_blank"
-              className="me-2"
-            >
-              <i className="fas fa-external-link-alt me-1"></i>Ouvrir le lien
-            </Button>
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              onClick={() => {
-                setLienAccesGenere('');
-                setNomMedecin('');
-                setEmailMedecin('');
-              }}
-            >
-              <i className="fas fa-times me-1"></i>Fermer
-            </Button>
-          </p>
-        </Alert>
-      )}
-
-      {/* Statistiques */}
-      <div className="stats-row">
-        <div className="stat-card">
-          <div className="stat-icon-wrapper stat-icon-blue">
-            <i className="fas fa-folder-open"></i>
-          </div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.total}</div>
-            <div className="stat-label">Dossiers au total</div>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon-wrapper stat-icon-green">
-            <i className="fas fa-check-circle"></i>
-          </div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.complete}</div>
-            <div className="stat-label">Dossiers complétés</div>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon-wrapper stat-icon-orange">
-            <i className="fas fa-clock"></i>
-          </div>
-          <div className="stat-content">
-            <div className="stat-value">{stats.en_cours}</div>
-            <div className="stat-label">Dossiers en cours</div>
-          </div>
-        </div>
-        
-        <div className="stat-card">
-          <div className="stat-icon-wrapper stat-icon-red">
-            <i className="fas fa-plus-circle"></i>
-          </div>
-          <div className="stat-content">
-            <div className="stat-value">{nouveauxDossiers}</div>
-            <div className="stat-label">Nouveaux (24h)</div>
-          </div>
+      {/* En-tête avec statistiques */}
+      <div className="row mb-4">
+        <div className="col-12">
+          <Card className="shadow-sm">
+            <Card.Header className="bg-primary text-white">
+              <h4 className="mb-0">
+                <i className="fas fa-clipboard-list me-2"></i>
+                Suivi des Procédures Médicales
+              </h4>
+            </Card.Header>
+            <Card.Body>
+              <div className="row">
+                <div className="col-md-3">
+                  <div className="text-center">
+                    <h3 className="text-primary">{stats.total}</h3>
+                    <p className="text-muted">Total Dossiers</p>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="text-center">
+                    <h3 className="text-warning">{stats.nouveau}</h3>
+                    <p className="text-muted">Nouveaux</p>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="text-center">
+                    <h3 className="text-info">{stats.en_cours}</h3>
+                    <p className="text-muted">En Cours</p>
+                  </div>
+                </div>
+                <div className="col-md-3">
+                  <div className="text-center">
+                    <h3 className="text-success">{stats.complete}</h3>
+                    <p className="text-muted">Complétés</p>
+                  </div>
+                </div>
+              </div>
+            </Card.Body>
+          </Card>
         </div>
       </div>
 
-      {/* Filtres */}
-      <Card className="mb-4 filters-section">
-        <Card.Body>
-          <Form>
-            <div className="row align-items-end">
-              <div className="col-md-3 mb-3 mb-md-0">
-                <Form.Label>Recherche</Form.Label>
-                <div className="search-bar w-100 position-relative">
+      {/* Filtres et actions */}
+      <div className="row mb-4">
+        <div className="col-12">
+          <Card>
+            <Card.Body>
+              <div className="row g-3">
+                <div className="col-md-3">
                   <Form.Control
                     type="text"
-                    placeholder="Nom, email, spécialité..."
+                    placeholder="Rechercher par nom, email..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="search-input"
                   />
-                  <i className="fas fa-search search-icon"></i>
+                </div>
+                <div className="col-md-2">
+                  <Form.Select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="">Tous les statuts</option>
+                    {Object.keys(etapesInfo).map(statut => (
+                      <option key={statut} value={statut}>
+                        {etapesInfo[statut].titre}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </div>
+                <div className="col-md-2">
+                  <Form.Select
+                    value={specialiteFilter}
+                    onChange={(e) => setSpecialiteFilter(e.target.value)}
+                  >
+                    <option value="">Toutes spécialités</option>
+                    {specialites.map(specialite => (
+                      <option key={specialite} value={specialite}>
+                        {specialite}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </div>
+                <div className="col-md-2">
+                  <Form.Select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                  >
+                    <option value="date_creation">Date création</option>
+                    <option value="nom">Nom</option>
+                    <option value="statut">Statut</option>
+                    <option value="specialite">Spécialité</option>
+                  </Form.Select>
+                </div>
+                <div className="col-md-2">
+                  <Form.Select
+                    value={order}
+                    onChange={(e) => setOrder(e.target.value)}
+                  >
+                    <option value="DESC">Décroissant</option>
+                    <option value="ASC">Croissant</option>
+                  </Form.Select>
+                </div>
+                <div className="col-md-1">
+                  <Button
+                    variant="success"
+                    onClick={() => setShowCreateModal(true)}
+                    className="w-100"
+                  >
+                    <i className="fas fa-plus"></i>
+                  </Button>
                 </div>
               </div>
-              
-              <div className="col-md-3 mb-3 mb-md-0">
-                <Form.Label>Statut</Form.Label>
-                <Form.Select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="">Tous les statuts</option>
-                  {Object.entries(etapesInfo).map(([key, etape]) => (
-                    <option key={key} value={key}>
-                      {etape.titre}
-                    </option>
-                  ))}
-                </Form.Select>
-              </div>
-              
-              <div className="col-md-3 mb-3 mb-md-0">
-                <Form.Label>Spécialité</Form.Label>
-                <Form.Select
-                  value={specialiteFilter}
-                  onChange={(e) => setSpecialiteFilter(e.target.value)}
-                >
-                  <option value="">Toutes les spécialités</option>
-                  {specialites.map((specialite, index) => (
-                    <option key={index} value={specialite}>
-                      {specialite}
-                    </option>
-                  ))}
-                </Form.Select>
-              </div>
-              
-              <div className="col-md-3">
-                <Button variant="primary" className="w-100" onClick={() => {
-                  setSearch('');
-                  setStatusFilter('');
-                  setSpecialiteFilter('');
-                }}>
-                  <i className="fas fa-filter me-2"></i>Réinitialiser les filtres
-                </Button>
-              </div>
-            </div>
-          </Form>
-        </Card.Body>
-      </Card>
+            </Card.Body>
+          </Card>
+        </div>
+      </div>
 
-      {/* Liste des dossiers */}
-      <Card className="mb-4">
-        <Card.Header className="d-flex justify-content-between align-items-center">
-          <div className="card-title">
-            <i className="fas fa-list me-2"></i>Liste des dossiers ({sortedDossiers.length})
-          </div>
-          <div>
-            <Button
-              variant="success"
-              size="sm"
-              className="me-2"
-              onClick={() => setShowCreateModal(true)}
-            >
-              <i className="fas fa-user-plus me-1"></i>Nouveau dossier
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={exportToCSV}
-            >
-              <i className="fas fa-download me-1"></i>Exporter
-            </Button>
-          </div>
-        </Card.Header>
-        <Card.Body className="p-0">
-          {isLoading ? (
-            <div className="text-center py-5">
-              <Spinner animation="border" variant="primary" />
-              <p className="mt-3">Chargement des données...</p>
-            </div>
-          ) : sortedDossiers.length === 0 ? (
-            <div className="text-center py-4">
-              <i className="fas fa-folder-open text-muted fa-2x mb-3"></i>
-              <p className="text-muted">Aucun dossier ne correspond aux critères de recherche</p>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <Table hover striped>
-                <thead>
-                  <tr>
-                    <th onClick={() => handleSortChange('id')} style={{cursor: 'pointer'}}>
-                      #ID <i className="fas fa-sort"></i>
-                    </th>
-                    <th>Médecin</th>
-                    <th onClick={() => handleSortChange('specialite')} style={{cursor: 'pointer'}}>
-                      Spécialité <i className="fas fa-sort"></i>
-                    </th>
-                    <th>Statut</th>
-                    <th onClick={() => handleSortChange('date_creation')} style={{cursor: 'pointer'}}>
-                      Date de création <i className="fas fa-sort"></i>
-                    </th>
-                    <th>Documents</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedDossiers.map((dossier) => {
-                    const isNew = isNewDossier(dossier.date_creation);
-                    const statusKey = dossier.statut || 'nouveau';
-                    
-                    return (
-                      <tr key={dossier.id} className={isNew ? "validation-needed" : ""}>
-                        <td>{dossier.id}</td>
+      {/* Tableau des dossiers */}
+      <div className="row">
+        <div className="col-12">
+          <Card>
+            <Card.Header>
+              <h5 className="mb-0">Liste des Dossiers ({filteredDossiers.length})</h5>
+            </Card.Header>
+            <Card.Body>
+              {isLoading ? (
+                <div className="text-center p-5">
+                  <Spinner animation="border" variant="primary" />
+                  <p className="mt-2">Chargement des dossiers...</p>
+                </div>
+              ) : (
+                <Table responsive striped hover>
+                  <thead>
+                    <tr>
+                      <th>Nom</th>
+                      <th>Email</th>
+                      <th>Spécialité</th>
+                      <th>Statut</th>
+                      <th>Date Création</th>
+                      <th>Dernière Modif.</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDossiers.map((dossier) => (
+                      <tr key={dossier.id}>
                         <td>
-                          <div className="d-flex align-items-center">
-                            <span className="me-2"><i className="fas fa-user-md text-primary"></i></span>
-                            <div>
-                              <div className="fw-bold">{dossier.nom} {dossier.prenom}</div>
-                              <small className="text-muted">{dossier.email}</small>
-                            </div>
-                            {isNew && <Badge bg="danger" className="ms-2">Nouveau</Badge>}
-                          </div>
+                          <strong>{dossier.nom} {dossier.prenom}</strong>
+                          <br />
+                          <small className="text-muted">{dossier.telephone}</small>
                         </td>
+                        <td>{dossier.email}</td>
                         <td>{dossier.specialite}</td>
                         <td>
-                          <Badge bg={etapesInfo[statusKey].couleur.replace('badge-', '')}>
-                            {etapesInfo[statusKey].titre}
+                          <Badge bg={getStatusBadgeColor(dossier.statut)}>
+                            {getStatusTitle(dossier.statut)}
                           </Badge>
                         </td>
-                        <td>{new Date(dossier.date_creation).toLocaleDateString('fr-FR')}</td>
+                        <td>{formatDate(dossier.date_creation)}</td>
+                        <td>{formatDate(dossier.derniere_modification)}</td>
                         <td>
-                          <span className="documents-indicator">
-                            <i className="fas fa-exclamation-circle"></i> 0 document
-                          </span>
-                        </td>
-                        <td>
-                          <div className="btn-group">
+                          <div className="btn-group" role="group">
                             <Button
+                              size="sm"
                               variant="outline-primary"
-                              size="sm"
-                              className="me-1"
-                              onClick={() => viewDossier(dossier.id)}
-                              title="Voir les détails"
-                            >
-                              <i className="fas fa-eye"></i>
-                            </Button>
-                            <Button
-                              variant="outline-info"
-                              size="sm"
-                              className="me-1"
                               onClick={() => {
                                 setSelectedDossier(dossier);
                                 setShowCommentModal(true);
@@ -792,171 +512,50 @@ const ProcedureTracking = () => {
                               <i className="fas fa-comment"></i>
                             </Button>
                             <Button
-                              variant="outline-success"
                               size="sm"
-                              className="me-1"
+                              variant="outline-warning"
                               onClick={() => {
                                 setSelectedDossier(dossier);
                                 setShowResendLinkModal(true);
                               }}
-                              title="Renvoyer lien d'accès"
+                              title="Renvoi lien d'accès"
                             >
                               <i className="fas fa-link"></i>
                             </Button>
                             <Button
-                              variant="outline-danger"
                               size="sm"
+                              variant="outline-danger"
                               onClick={() => {
                                 setSelectedDossier(dossier);
                                 setShowDeleteModal(true);
                               }}
-                              title="Supprimer le dossier"
+                              title="Supprimer"
                             >
                               <i className="fas fa-trash"></i>
                             </Button>
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-            </div>
-          )}
-        </Card.Body>
-      </Card>
+                    ))}
+                  </tbody>
+                </Table>
+              )}
+            </Card.Body>
+          </Card>
+        </div>
+      </div>
 
-      {/* Modal Ajouter Commentaire */}
-      <Modal show={showCommentModal} onHide={() => setShowCommentModal(false)}>
-        <Modal.Header>
-          <Modal.Title>
-            <i className="fas fa-comment-dots me-2"></i>
-            Ajouter un commentaire
-            {selectedDossier && ` pour ${selectedDossier.prenom} ${selectedDossier.nom}`}
-          </Modal.Title>
-          <Button variant="close" onClick={() => setShowCommentModal(false)} />
+      {/* Modal de création de dossier */}
+      <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Nouveau Dossier Médical</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Commentaire</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={4}
-              value={commentaire}
-              onChange={(e) => setCommentaire(e.target.value)}
-              placeholder="Saisissez votre commentaire sur ce dossier..."
-              required
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowCommentModal(false)}>
-            Annuler
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={handleAddComment}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Spinner
-                  as="span"
-                  animation="border"
-                  size="sm"
-                  role="status"
-                  aria-hidden="true"
-                  className="me-2"
-                />
-                Enregistrement...
-              </>
-            ) : (
-              <>
-                <i className="fas fa-save me-2"></i>
-                Enregistrer
-              </>
-            )}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Modal Confirmation Suppression */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
-        <Modal.Header className="bg-danger text-white">
-          <Modal.Title>
-            <i className="fas fa-exclamation-triangle me-2"></i>
-            Confirmation de suppression
-          </Modal.Title>
-          <Button variant="close" className="btn-close-white" onClick={() => setShowDeleteModal(false)} />
-        </Modal.Header>
-        <Modal.Body>
-          {selectedDossier && (
-            <>
-              <p className="mb-3">
-                Êtes-vous sûr de vouloir supprimer définitivement le dossier de <strong>{selectedDossier.prenom} {selectedDossier.nom}</strong> ? Cette action est irréversible.
-              </p>
-              <Alert variant="warning">
-                <i className="fas fa-info-circle me-2"></i>
-                La suppression entraînera l'effacement de tous les documents et historiques associés.
-              </Alert>
-            </>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-            Annuler
-          </Button>
-          <Button 
-            variant="danger" 
-            onClick={handleDeleteDossier}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Spinner
-                  as="span"
-                  animation="border"
-                  size="sm"
-                  role="status"
-                  aria-hidden="true"
-                  className="me-2"
-                />
-                Suppression...
-              </>
-            ) : (
-              <>
-                <i className="fas fa-trash me-2"></i>
-                Confirmer la suppression
-              </>
-            )}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Modal Création de Dossier */}
-      <Modal 
-        show={showCreateModal} 
-        onHide={() => setShowCreateModal(false)}
-        size="lg"
-      >
-        <Modal.Header>
-          <Modal.Title>
-            <i className="fas fa-user-plus me-2"></i>
-            Créer un dossier médecin
-          </Modal.Title>
-          <Button variant="close" onClick={() => setShowCreateModal(false)} />
-        </Modal.Header>
-        <Form onSubmit={handleCreateDossier}>
-          <Modal.Body>
-            <Alert variant="info">
-              <i className="fas fa-info-circle me-2"></i>
-              Créez un dossier pour un médecin. Un lien d'accès lui sera automatiquement envoyé par email.
-            </Alert>
-            
+          <Form>
             <div className="row">
-              <div className="col-md-6 mb-3">
-                <Form.Group>
-                  <Form.Label>Nom <span className="text-danger">*</span></Form.Label>
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
+                  <Form.Label>Nom *</Form.Label>
                   <Form.Control
                     type="text"
                     value={newDossierData.nom}
@@ -965,9 +564,9 @@ const ProcedureTracking = () => {
                   />
                 </Form.Group>
               </div>
-              <div className="col-md-6 mb-3">
-                <Form.Group>
-                  <Form.Label>Prénom <span className="text-danger">*</span></Form.Label>
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
+                  <Form.Label>Prénom *</Form.Label>
                   <Form.Control
                     type="text"
                     value={newDossierData.prenom}
@@ -977,24 +576,20 @@ const ProcedureTracking = () => {
                 </Form.Group>
               </div>
             </div>
-            
             <div className="row">
-              <div className="col-md-6 mb-3">
-                <Form.Group>
-                  <Form.Label>Email <span className="text-danger">*</span></Form.Label>
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
+                  <Form.Label>Email *</Form.Label>
                   <Form.Control
                     type="email"
                     value={newDossierData.email}
                     onChange={(e) => setNewDossierData({...newDossierData, email: e.target.value})}
                     required
                   />
-                  <Form.Text className="text-muted">
-                    Un lien d'accès sera envoyé à cette adresse
-                  </Form.Text>
                 </Form.Group>
               </div>
-              <div className="col-md-6 mb-3">
-                <Form.Group>
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
                   <Form.Label>Téléphone</Form.Label>
                   <Form.Control
                     type="tel"
@@ -1004,10 +599,9 @@ const ProcedureTracking = () => {
                 </Form.Group>
               </div>
             </div>
-            
             <div className="row">
-              <div className="col-md-6 mb-3">
-                <Form.Group>
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
                   <Form.Label>Nationalité</Form.Label>
                   <Form.Control
                     type="text"
@@ -1016,23 +610,21 @@ const ProcedureTracking = () => {
                   />
                 </Form.Group>
               </div>
-              <div className="col-md-6 mb-3">
-                <Form.Group>
-                  <Form.Label>Spécialité médicale <span className="text-danger">*</span></Form.Label>
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
+                  <Form.Label>Spécialité</Form.Label>
                   <Form.Control
                     type="text"
                     value={newDossierData.specialite}
                     onChange={(e) => setNewDossierData({...newDossierData, specialite: e.target.value})}
-                    required
                   />
                 </Form.Group>
               </div>
             </div>
-            
             <div className="row">
-              <div className="col-md-6 mb-3">
-                <Form.Group>
-                  <Form.Label>Université/École de médecine</Form.Label>
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
+                  <Form.Label>Université</Form.Label>
                   <Form.Control
                     type="text"
                     value={newDossierData.universite}
@@ -1040,8 +632,8 @@ const ProcedureTracking = () => {
                   />
                 </Form.Group>
               </div>
-              <div className="col-md-6 mb-3">
-                <Form.Group>
+              <div className="col-md-6">
+                <Form.Group className="mb-3">
                   <Form.Label>Pays du diplôme</Form.Label>
                   <Form.Control
                     type="text"
@@ -1051,110 +643,117 @@ const ProcedureTracking = () => {
                 </Form.Group>
               </div>
             </div>
-            
-            <Form.Group className="mb-3">
-              <Form.Check
-                type="checkbox"
-                id="confirmEnvoi"
-                label="Je confirme la création du dossier et l'envoi d'un email au médecin *"
-                checked={confirmEnvoi}
-                onChange={(e) => setConfirmEnvoi(e.target.checked)}
-                required
-              />
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-              Annuler
-            </Button>
-            <Button 
-              variant="success" 
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Spinner
-                    as="span"
-                    animation="border"
-                    size="sm"
-                    role="status"
-                    aria-hidden="true"
-                    className="me-2"
-                  />
-                  Création en cours...
-                </>
-              ) : (
-                <>
-                  <i className="fas fa-user-plus me-2"></i>
-                  Créer le dossier et envoyer l'invitation
-                </>
-              )}
-            </Button>
-          </Modal.Footer>
-        </Form>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+            Annuler
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={handleCreateDossier}
+            disabled={isSubmitting || !newDossierData.nom || !newDossierData.prenom || !newDossierData.email}
+          >
+            {isSubmitting ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-2" />
+                Création...
+              </>
+            ) : (
+              'Créer le dossier'
+            )}
+          </Button>
+        </Modal.Footer>
       </Modal>
 
-      {/* Modal Renvoyer Lien */}
-      <Modal show={showResendLinkModal} onHide={() => setShowResendLinkModal(false)}>
-        <Modal.Header>
-          <Modal.Title>
-            <i className="fas fa-link me-2"></i>
-            Renvoyer un lien d'accès
-          </Modal.Title>
-          <Button variant="close" onClick={() => setShowResendLinkModal(false)} />
+      {/* Modal d'ajout de commentaire */}
+      <Modal show={showCommentModal} onHide={() => setShowCommentModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Ajouter un commentaire</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {selectedDossier && (
-            <>
-              <Alert variant="info">
-                <i className="fas fa-info-circle me-2"></i>
-                Vous êtes sur le point de générer un nouveau lien d'accès pour Dr. {selectedDossier.prenom} {selectedDossier.nom}.
-                Un email lui sera automatiquement envoyé avec ce lien.
-                <br />
-                <strong>Email:</strong> {selectedDossier.email}
-              </Alert>
-              
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="checkbox"
-                  id="confirmRenvoi"
-                  label="Je confirme l'envoi d'un nouveau lien d'accès au médecin"
-                  checked={confirmRenvoi}
-                  onChange={(e) => setConfirmRenvoi(e.target.checked)}
-                  required
-                />
-              </Form.Group>
-            </>
-          )}
+          <Form.Group>
+            <Form.Label>Commentaire</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={commentaire}
+              onChange={(e) => setCommentaire(e.target.value)}
+              placeholder="Ajoutez un commentaire sur ce dossier..."
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowCommentModal(false)}>
+            Annuler
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={handleAddCommentaire}
+            disabled={!commentaire.trim()}
+          >
+            Ajouter
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal de suppression */}
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmer la suppression</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          Êtes-vous sûr de vouloir supprimer le dossier de {selectedDossier?.nom} {selectedDossier?.prenom} ?
+          Cette action est irréversible.
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            Annuler
+          </Button>
+          <Button variant="danger" onClick={handleDeleteDossier}>
+            Supprimer
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal de renvoi de lien */}
+      <Modal show={showResendLinkModal} onHide={() => setShowResendLinkModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Renvoi du lien d'accès</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Un nouveau lien d'accès sera généré et envoyé à :</p>
+          <p><strong>{selectedDossier?.nom} {selectedDossier?.prenom}</strong></p>
+          <p><strong>{selectedDossier?.email}</strong></p>
+          <p>Êtes-vous sûr de vouloir procéder ?</p>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowResendLinkModal(false)}>
             Annuler
           </Button>
-          <Button 
-            variant="success" 
-            onClick={handleResendLink}
-            disabled={!confirmRenvoi || isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Spinner
-                  as="span"
-                  animation="border"
-                  size="sm"
-                  role="status"
-                  aria-hidden="true"
-                  className="me-2"
-                />
-                Envoi en cours...
-              </>
-            ) : (
-              <>
-                <i className="fas fa-paper-plane me-2"></i>
-                Envoyer le nouveau lien
-              </>
-            )}
+          <Button variant="primary" onClick={handleResendLink}>
+            Renvoyer le lien
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal de confirmation d'envoi */}
+      <Modal show={confirmEnvoi} onHide={() => setConfirmEnvoi(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Lien d'accès généré</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Le lien d'accès a été généré pour :</p>
+          <p><strong>{nomMedecin}</strong></p>
+          <p><strong>{emailMedecin}</strong></p>
+          <p>Lien d'accès :</p>
+          <div className="alert alert-info">
+            <code>{lienAccesGenere}</code>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setConfirmEnvoi(false)}>
+            Fermer
           </Button>
         </Modal.Footer>
       </Modal>

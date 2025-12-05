@@ -1,285 +1,279 @@
 import React, { useState, useEffect } from 'react';
-import { Formik, Form, Field, ErrorMessage } from 'formik';
-import * as Yup from 'yup';
+import { performanceService, employeeService } from '../../services/api';
 import '../../styles/Tables.css';
 import '../../styles/Forms.css';
 
-const ContractManagement = () => {
-  const [showModal, setShowModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [contracts, setContracts] = useState([]);
+const PerformanceManagement = () => {
+  const [evaluations, setEvaluations] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedContract, setSelectedContract] = useState(null);
-
-  // Validation schema for contract form
-  const contractSchema = Yup.object().shape({
-    employeeId: Yup.string().required('L\'employé est requis'),
-    contractType: Yup.string().required('Le type de contrat est requis'),
-    startDate: Yup.date().required('La date de début est requise'),
-    endDate: Yup.date().when('contractType', {
-      is: (type) => type !== 'CDI',
-      then: Yup.date().required('La date de fin est requise')
-        .min(
-          Yup.ref('startDate'), 
-          'La date de fin doit être postérieure à la date de début'
-        ),
-      otherwise: Yup.date().nullable()
-    }),
-    position: Yup.string().required('Le poste est requis'),
-    department: Yup.string().required('Le département est requis'),
-    salary: Yup.number()
-      .required('Le salaire est requis')
-      .positive('Le salaire doit être positif'),
+  const [error, setError] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedEvaluation, setSelectedEvaluation] = useState(null);
+  const [formData, setFormData] = useState({
+    employee_id: '',
+    evaluation_date: new Date().toISOString().split('T')[0],
+    period: '',
+    overall_rating: '',
+    comments: '',
+    goals: '',
+    achievements: '',
+    areas_for_improvement: ''
   });
 
-  // Contract types
-  const contractTypes = [
-    'CDI',
-    'CDD',
-    'Intérim',
-    'Stage',
-    'Alternance',
-    'Freelance'
-  ];
-
-  // Mock employees list
-  const employees = [
-    { id: '1', name: 'John Doe' },
-    { id: '2', name: 'Jane Smith' },
-    { id: '3', name: 'Robert Johnson' }
-  ];
-
-  // Departments
-  const departments = [
-    'Administration',
-    'Ressources Humaines',
-    'Finance',
-    'Marketing',
-    'Informatique',
-    'Production',
-    'Logistique',
-    'Commercial',
-    'Recherche et Développement'
-  ];
-
+  // Charger les données
   useEffect(() => {
-    // Simulate API call to fetch contracts
-    const fetchContracts = async () => {
-      setIsLoading(true);
+    const loadData = async () => {
       try {
-        // In a real application, this would be an API call
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-        
-        // Mock data
-        const mockContracts = [
-          {
-            id: '1',
-            employeeId: '1',
-            employeeName: 'John Doe',
-            contractType: 'CDI',
-            startDate: '2024-01-15',
-            endDate: null,
-            position: 'Développeur Senior',
-            department: 'Informatique',
-            salary: 48000,
-            status: 'Active',
-            createdBy: 'Admin RH',
-            createdAt: '2024-01-10'
-          },
-          {
-            id: '2',
-            employeeId: '2',
-            employeeName: 'Jane Smith',
-            contractType: 'CDD',
-            startDate: '2024-06-01',
-            endDate: '2025-06-01',
-            position: 'Responsable Marketing',
-            department: 'Marketing',
-            salary: 42000,
-            status: 'Active',
-            createdBy: 'Admin RH',
-            createdAt: '2024-05-15'
-          },
-          {
-            id: '3',
-            employeeId: '3',
-            employeeName: 'Robert Johnson',
-            contractType: 'Stage',
-            startDate: '2024-07-01',
-            endDate: '2024-12-31',
-            position: 'Assistant RH',
-            department: 'Ressources Humaines',
-            salary: 12000,
-            status: 'Pending',
-            createdBy: 'Admin RH',
-            createdAt: '2024-06-20'
-          }
-        ];
-        
-        setContracts(mockContracts);
-      } catch (error) {
-        console.error('Error fetching contracts:', error);
+        setIsLoading(true);
+        const [evaluationsData, employeesData] = await Promise.all([
+          performanceService.getAll().catch(() => []),
+          employeeService.getAll().catch(() => [])
+        ]);
+        setEvaluations(evaluationsData);
+        setEmployees(employeesData);
+      } catch (err) {
+        console.error('Erreur lors du chargement des données:', err);
+        setError('Erreur lors du chargement des données');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchContracts();
+    loadData();
   }, []);
 
-  // Handle contract submission
-  const handleSubmit = async (values, { resetForm }) => {
-    setIsSubmitting(true);
-    setSubmitSuccess(false);
+  // Gérer les changements du formulaire
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  // Ouvrir la modale d'ajout
+  const openAddModal = () => {
+    setSelectedEvaluation(null);
+    setFormData({
+      employee_id: '',
+      evaluation_date: new Date().toISOString().split('T')[0],
+      period: '',
+      overall_rating: '',
+      comments: '',
+      goals: '',
+      achievements: '',
+      areas_for_improvement: ''
+    });
+    setShowModal(true);
+  };
+
+  // Ouvrir la modale d'édition
+  const openEditModal = (evaluation) => {
+    setSelectedEvaluation(evaluation);
+    setFormData({
+      employee_id: evaluation.employee_id || '',
+      evaluation_date: evaluation.evaluation_date ? evaluation.evaluation_date.split('T')[0] : new Date().toISOString().split('T')[0],
+      period: evaluation.period || '',
+      overall_rating: evaluation.overall_rating || '',
+      comments: evaluation.comments || '',
+      goals: evaluation.goals || '',
+      achievements: evaluation.achievements || '',
+      areas_for_improvement: evaluation.areas_for_improvement || ''
+    });
+    setShowModal(true);
+  };
+
+  // Fermer la modale
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedEvaluation(null);
+    setError(null);
+  };
+
+  // Soumettre le formulaire
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
 
     try {
-      // In a real application, this would be an API call
-      console.log('Form values:', values);
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Create a new contract object
-      const newContract = {
-        id: Date.now().toString(),
-        employeeId: values.employeeId,
-        employeeName: employees.find(emp => emp.id === values.employeeId)?.name || 'Unknown',
-        contractType: values.contractType,
-        startDate: values.startDate,
-        endDate: values.endDate || null,
-        position: values.position,
-        department: values.department,
-        salary: values.salary,
-        status: 'Pending',
-        createdBy: 'Admin RH',
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-      
-      // Add the new contract to the list
-      setContracts(prev => [newContract, ...prev]);
-      
-      // Success
-      setSubmitSuccess(true);
-      resetForm();
-      
-      // Close modal after success
-      setTimeout(() => {
-        setShowModal(false);
-        setSubmitSuccess(false);
-      }, 1500);
-    } catch (error) {
-      console.error('Error submitting contract:', error);
-    } finally {
-      setIsSubmitting(false);
+      if (selectedEvaluation) {
+        // Mise à jour
+        await performanceService.update(selectedEvaluation.id, formData);
+      } else {
+        // Création
+        await performanceService.create(formData);
+      }
+
+      // Recharger les données
+      const evaluationsData = await performanceService.getAll();
+      setEvaluations(evaluationsData);
+      closeModal();
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde:', err);
+      setError('Erreur lors de la sauvegarde de l\'évaluation');
     }
   };
 
-  // Handle view contract details
-  const handleViewDetails = (id) => {
-    const contract = contracts.find(c => c.id === id);
-    setSelectedContract(contract);
-    // In a real app, this would open a modal with details
-    console.log('Viewing contract details:', contract);
+  // Supprimer une évaluation
+  const handleDelete = async (id) => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette évaluation ?')) {
+      return;
+    }
+
+    try {
+      await performanceService.delete(id);
+      const evaluationsData = await performanceService.getAll();
+      setEvaluations(evaluationsData);
+    } catch (err) {
+      console.error('Erreur lors de la suppression:', err);
+      setError('Erreur lors de la suppression de l\'évaluation');
+    }
   };
+
+  // Obtenir le nom de l'employé
+  const getEmployeeName = (employeeId) => {
+    const employee = employees.find(emp => emp.id === employeeId);
+    return employee ? employee.nom_prenom : 'Employé non trouvé';
+  };
+
+  // Formater la note
+  const formatRating = (rating) => {
+    const ratings = {
+      'excellent': 'Excellent',
+      'very_good': 'Très bien',
+      'good': 'Bien',
+      'satisfactory': 'Satisfaisant',
+      'needs_improvement': 'À améliorer'
+    };
+    return ratings[rating] || rating;
+  };
+
+  // Obtenir la couleur de la note
+  const getRatingColor = (rating) => {
+    const colors = {
+      'excellent': 'success',
+      'very_good': 'info',
+      'good': 'primary',
+      'satisfactory': 'warning',
+      'needs_improvement': 'danger'
+    };
+    return colors[rating] || 'secondary';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="text-center p-5">
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Chargement...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="page-title-wrapper">
         <div className="title-content">
-          <h1 className="page-title">Gestion des contrats</h1>
-          <p className="page-subtitle">Gérez les contrats de travail des employés.</p>
+          <h1 className="page-title">Gestion des Performances</h1>
+          <p className="page-subtitle">Gérez les évaluations de performance des employés.</p>
         </div>
+        <button className="btn btn-primary" onClick={openAddModal}>
+          <i className="fas fa-plus me-2"></i>
+          Nouvelle Évaluation
+        </button>
       </div>
 
-      <div className="card table-card mb-4">
-        <div className="card-header d-flex justify-content-between align-items-center">
-          <div className="d-flex align-items-center">
-            <div className="card-icon">
-              <i className="fas fa-file-signature"></i>
-            </div>
-            <h3 className="card-title">Contrats de travail</h3>
-          </div>
-          <button 
-            className="btn btn-primary" 
-            onClick={() => setShowModal(true)}
-          >
-            <i className="fas fa-plus me-2"></i>
-            Nouveau contrat
-          </button>
+      {error && (
+        <div className="alert alert-danger alert-dismissible fade show" role="alert">
+          <i className="fas fa-exclamation-circle me-2"></i>
+          {error}
+          <button type="button" className="btn-close" onClick={() => setError(null)}></button>
         </div>
-        
+      )}
+
+      <div className="card table-card">
+        <div className="card-header">
+          <h5 className="card-title mb-0">
+            <i className="fas fa-chart-line me-2"></i>
+            Évaluations de Performance
+          </h5>
+        </div>
         <div className="card-body">
-          {isLoading ? (
+          {evaluations.length === 0 ? (
             <div className="text-center p-5">
-              <div className="spinner-border text-primary" role="status">
-                <span className="visually-hidden">Chargement...</span>
-              </div>
-            </div>
-          ) : contracts.length === 0 ? (
-            <div className="alert alert-info text-center">
-              <i className="fas fa-info-circle me-2"></i>
-              Aucun contrat trouvé.
+              <i className="fas fa-chart-line fa-3x text-muted mb-3"></i>
+              <h5 className="text-muted">Aucune évaluation trouvée</h5>
+              <p className="text-muted">Commencez par créer une nouvelle évaluation de performance.</p>
+              <button className="btn btn-primary" onClick={openAddModal}>
+                <i className="fas fa-plus me-2"></i>
+                Nouvelle Évaluation
+              </button>
             </div>
           ) : (
             <div className="table-responsive">
-              <table className="table table-hover align-middle custom-table">
-                <thead>
+              <table className="table table-hover">
+                <thead className="table-light">
                   <tr>
                     <th>Employé</th>
-                    <th>Type de contrat</th>
-                    <th>Poste</th>
-                    <th>Département</th>
-                    <th>Date de début</th>
-                    <th>Date de fin</th>
-                    <th>Salaire annuel</th>
-                    <th>Statut</th>
+                    <th>Date d'évaluation</th>
+                    <th>Période</th>
+                    <th>Note globale</th>
+                    <th>Commentaires</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {contracts.map((contract) => (
-                    <tr key={contract.id}>
-                      <td>{contract.employeeName}</td>
-                      <td>{contract.contractType}</td>
-                      <td>{contract.position}</td>
-                      <td>{contract.department}</td>
-                      <td>{new Date(contract.startDate).toLocaleDateString('fr-FR')}</td>
+                  {evaluations.map((evaluation) => (
+                    <tr key={evaluation.id}>
                       <td>
-                        {contract.endDate 
-                          ? new Date(contract.endDate).toLocaleDateString('fr-FR')
+                        <div className="d-flex align-items-center">
+                          <div 
+                            className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2"
+                            style={{ width: '32px', height: '32px', fontSize: '12px' }}
+                          >
+                            {getEmployeeName(evaluation.employee_id).split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
+                          </div>
+                          <div>
+                            <div className="fw-bold">{getEmployeeName(evaluation.employee_id)}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        {evaluation.evaluation_date 
+                          ? new Date(evaluation.evaluation_date).toLocaleDateString('fr-FR')
                           : '-'
                         }
                       </td>
-                      <td>{contract.salary.toLocaleString('fr-FR')} €</td>
+                      <td>{evaluation.period || '-'}</td>
                       <td>
-                        {contract.status === 'Active' && (
-                          <span className="badge bg-success">Actif</span>
-                        )}
-                        {contract.status === 'Pending' && (
-                          <span className="badge bg-warning text-dark">En attente</span>
-                        )}
-                        {contract.status === 'Expired' && (
-                          <span className="badge bg-secondary">Expiré</span>
-                        )}
-                        {contract.status === 'Terminated' && (
-                          <span className="badge bg-danger">Résilié</span>
-                        )}
+                        <span className={`badge bg-${getRatingColor(evaluation.overall_rating)}`}>
+                          {formatRating(evaluation.overall_rating)}
+                        </span>
                       </td>
                       <td>
-                        <div className="btn-group">
-                          <button 
-                            className="btn btn-sm btn-info me-1" 
-                            onClick={() => handleViewDetails(contract.id)}
-                            title="Voir détails"
+                        {evaluation.comments 
+                          ? (evaluation.comments.length > 50 
+                              ? evaluation.comments.substring(0, 50) + '...' 
+                              : evaluation.comments)
+                          : '-'
+                        }
+                      </td>
+                      <td>
+                        <div className="btn-group btn-group-sm">
+                          <button
+                            className="btn btn-outline-primary"
+                            onClick={() => openEditModal(evaluation)}
+                            title="Modifier"
                           >
-                            <i className="fas fa-eye"></i>
+                            <i className="fas fa-edit"></i>
                           </button>
-                          <button 
-                            className="btn btn-sm btn-secondary" 
-                            title="Télécharger"
+                          <button
+                            className="btn btn-outline-danger"
+                            onClick={() => handleDelete(evaluation.id)}
+                            title="Supprimer"
                           >
-                            <i className="fas fa-download"></i>
+                            <i className="fas fa-trash"></i>
                           </button>
                         </div>
                       </td>
@@ -292,168 +286,133 @@ const ContractManagement = () => {
         </div>
       </div>
 
-      {/* New Contract Modal */}
+      {/* Modale d'ajout/édition */}
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h5 className="modal-title">Nouveau contrat de travail</h5>
-              <button 
-                type="button" 
-                className="btn-close" 
-                onClick={() => setShowModal(false)}
-              ></button>
-            </div>
-            <div className="modal-body">
-              {submitSuccess && (
-                <div className="alert alert-success" role="alert">
-                  <i className="fas fa-check-circle me-2"></i>
-                  Contrat enregistré avec succès!
-                </div>
-              )}
-
-              <Formik
-                initialValues={{
-                  employeeId: '',
-                  contractType: '',
-                  startDate: '',
-                  endDate: '',
-                  position: '',
-                  department: '',
-                  salary: ''
-                }}
-                validationSchema={contractSchema}
-                onSubmit={handleSubmit}
-              >
-                {({ errors, touched, values }) => (
-                  <Form>
-                    <div className="mb-3">
-                      <label htmlFor="employeeId" className="form-label">Employé <span className="text-danger">*</span></label>
-                      <Field
-                        as="select"
-                        name="employeeId"
-                        className={`form-select ${errors.employeeId && touched.employeeId ? 'is-invalid' : ''}`}
+        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  <i className="fas fa-chart-line me-2"></i>
+                  {selectedEvaluation ? 'Modifier l\'évaluation' : 'Nouvelle évaluation'}
+                </h5>
+                <button type="button" className="btn-close" onClick={closeModal}></button>
+              </div>
+              <form onSubmit={handleSubmit}>
+                <div className="modal-body">
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Employé <span className="text-danger">*</span></label>
+                      <select
+                        name="employee_id"
+                        className="form-select"
+                        value={formData.employee_id}
+                        onChange={handleFormChange}
+                        required
                       >
-                        <option value="">Sélectionnez un employé</option>
-                        {employees.map((employee) => (
-                          <option key={employee.id} value={employee.id}>
-                            {employee.name}
+                        <option value="">Sélectionner un employé</option>
+                        {employees.map((emp) => (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.nom_prenom}
                           </option>
                         ))}
-                      </Field>
-                      <ErrorMessage name="employeeId" component="div" className="invalid-feedback" />
+                      </select>
                     </div>
-
-                    <div className="mb-3">
-                      <label htmlFor="contractType" className="form-label">Type de contrat <span className="text-danger">*</span></label>
-                      <Field
-                        as="select"
-                        name="contractType"
-                        className={`form-select ${errors.contractType && touched.contractType ? 'is-invalid' : ''}`}
-                      >
-                        <option value="">Sélectionnez un type de contrat</option>
-                        {contractTypes.map((type, index) => (
-                          <option key={index} value={type}>{type}</option>
-                        ))}
-                      </Field>
-                      <ErrorMessage name="contractType" component="div" className="invalid-feedback" />
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Date d'évaluation <span className="text-danger">*</span></label>
+                      <input
+                        type="date"
+                        name="evaluation_date"
+                        className="form-control"
+                        value={formData.evaluation_date}
+                        onChange={handleFormChange}
+                        required
+                      />
                     </div>
-
-                    <div className="row">
-                      <div className="col-md-6 mb-3">
-                        <label htmlFor="startDate" className="form-label">Date de début <span className="text-danger">*</span></label>
-                        <Field
-                          name="startDate"
-                          type="date"
-                          className={`form-control ${errors.startDate && touched.startDate ? 'is-invalid' : ''}`}
-                        />
-                        <ErrorMessage name="startDate" component="div" className="invalid-feedback" />
-                      </div>
-
-                      <div className="col-md-6 mb-3">
-                        <label htmlFor="endDate" className="form-label">
-                          Date de fin
-                          {values.contractType && values.contractType !== 'CDI' && (
-                            <span className="text-danger">*</span>
-                          )}
-                        </label>
-                        <Field
-                          name="endDate"
-                          type="date"
-                          className={`form-control ${errors.endDate && touched.endDate ? 'is-invalid' : ''}`}
-                          disabled={values.contractType === 'CDI'}
-                        />
-                        <ErrorMessage name="endDate" component="div" className="invalid-feedback" />
-                        {values.contractType === 'CDI' && (
-                          <small className="form-text text-muted">Non applicable pour un CDI</small>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mb-3">
-                      <label htmlFor="position" className="form-label">Poste <span className="text-danger">*</span></label>
-                      <Field
-                        name="position"
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Période</label>
+                      <input
                         type="text"
-                        className={`form-control ${errors.position && touched.position ? 'is-invalid' : ''}`}
+                        name="period"
+                        className="form-control"
+                        value={formData.period}
+                        onChange={handleFormChange}
+                        placeholder="Ex: Trimestre 1 2025"
                       />
-                      <ErrorMessage name="position" component="div" className="invalid-feedback" />
                     </div>
-
-                    <div className="mb-3">
-                      <label htmlFor="department" className="form-label">Département <span className="text-danger">*</span></label>
-                      <Field
-                        as="select"
-                        name="department"
-                        className={`form-select ${errors.department && touched.department ? 'is-invalid' : ''}`}
+                    <div className="col-md-6 mb-3">
+                      <label className="form-label">Note globale <span className="text-danger">*</span></label>
+                      <select
+                        name="overall_rating"
+                        className="form-select"
+                        value={formData.overall_rating}
+                        onChange={handleFormChange}
+                        required
                       >
-                        <option value="">Sélectionnez un département</option>
-                        {departments.map((dept, index) => (
-                          <option key={index} value={dept}>{dept}</option>
-                        ))}
-                      </Field>
-                      <ErrorMessage name="department" component="div" className="invalid-feedback" />
+                        <option value="">Sélectionner une note</option>
+                        <option value="excellent">Excellent</option>
+                        <option value="very_good">Très bien</option>
+                        <option value="good">Bien</option>
+                        <option value="satisfactory">Satisfaisant</option>
+                        <option value="needs_improvement">À améliorer</option>
+                      </select>
                     </div>
-
-                    <div className="mb-3">
-                      <label htmlFor="salary" className="form-label">Salaire annuel (€) <span className="text-danger">*</span></label>
-                      <Field
-                        name="salary"
-                        type="number"
-                        className={`form-control ${errors.salary && touched.salary ? 'is-invalid' : ''}`}
+                    <div className="col-12 mb-3">
+                      <label className="form-label">Objectifs</label>
+                      <textarea
+                        name="goals"
+                        className="form-control"
+                        rows="3"
+                        value={formData.goals}
+                        onChange={handleFormChange}
+                        placeholder="Objectifs fixés pour cette période..."
                       />
-                      <ErrorMessage name="salary" component="div" className="invalid-feedback" />
                     </div>
-
-                    <div className="modal-footer">
-                      <button 
-                        type="button" 
-                        className="btn btn-outline-secondary" 
-                        onClick={() => setShowModal(false)}
-                      >
-                        Annuler
-                      </button>
-                      <button 
-                        type="submit" 
-                        className="btn btn-primary" 
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Traitement...
-                          </>
-                        ) : (
-                          <>
-                            <i className="fas fa-save me-2"></i>
-                            Enregistrer
-                          </>
-                        )}
-                      </button>
+                    <div className="col-12 mb-3">
+                      <label className="form-label">Réalisations</label>
+                      <textarea
+                        name="achievements"
+                        className="form-control"
+                        rows="3"
+                        value={formData.achievements}
+                        onChange={handleFormChange}
+                        placeholder="Réalisations et accomplissements..."
+                      />
                     </div>
-                  </Form>
-                )}
-              </Formik>
+                    <div className="col-12 mb-3">
+                      <label className="form-label">Axes d'amélioration</label>
+                      <textarea
+                        name="areas_for_improvement"
+                        className="form-control"
+                        rows="3"
+                        value={formData.areas_for_improvement}
+                        onChange={handleFormChange}
+                        placeholder="Points à améliorer..."
+                      />
+                    </div>
+                    <div className="col-12 mb-3">
+                      <label className="form-label">Commentaires</label>
+                      <textarea
+                        name="comments"
+                        className="form-control"
+                        rows="4"
+                        value={formData.comments}
+                        onChange={handleFormChange}
+                        placeholder="Commentaires généraux sur la performance..."
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={closeModal}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    <i className="fas fa-save me-2"></i>
+                    {selectedEvaluation ? 'Modifier' : 'Créer'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -462,4 +421,4 @@ const ContractManagement = () => {
   );
 };
 
-export default ContractManagement;
+export default PerformanceManagement;

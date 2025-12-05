@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import employeeService from '../../services/employeeService';
 import '../../styles/Forms.css';
 import '../../styles/Tables.css';
+import '../../styles/PhotoUpload.css';
 
 const NewEmployee = () => {
     const navigate = useNavigate();
@@ -12,6 +13,8 @@ const NewEmployee = () => {
     ]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [photo, setPhoto] = useState(null);
+    const [photoPreview, setPhotoPreview] = useState(null);
 
     // Ajoutez cette fonction de calcul du total de rémunération dans votre composant
     const calculateTotalRemuneration = () => {
@@ -143,6 +146,41 @@ const NewEmployee = () => {
         }));
     };
 
+    const handlePhotoChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Vérifier la taille du fichier (5MB max)
+            if (file.size > 5 * 1024 * 1024) {
+                setError('La photo ne doit pas dépasser 5MB');
+                return;
+            }
+
+            // Vérifier le type de fichier
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                setError('Seules les images sont autorisées (JPEG, JPG, PNG, GIF, WebP)');
+                return;
+            }
+
+            setPhoto(file);
+            
+            // Créer une prévisualisation
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                setPhotoPreview(e.target.result);
+            };
+            reader.readAsDataURL(file);
+            
+            // Effacer les erreurs précédentes
+            setError(null);
+        }
+    };
+
+    const removePhoto = () => {
+        setPhoto(null);
+        setPhotoPreview(null);
+    };
+
     // Ajouter un document
     const handleAddDocument = () => {
         setDocuments([...documents, { type: '', file: null }]);
@@ -184,6 +222,11 @@ const NewEmployee = () => {
                 formData.append('document_types', doc.type);
             }
         });
+
+        // Ajouter la photo si elle existe
+        if (photo) {
+            formData.append('photo', photo);
+        }
 
         try {
             console.log('Envoi des données...', formData);
@@ -336,6 +379,43 @@ const NewEmployee = () => {
                                   onChange={handleInputChange}
                                   required 
                               />
+                          </div>
+                      </div>
+
+                      {/* Section Photo de profil */}
+                      <h3 className="form-section-title mt-5">Photo de profil</h3>
+                      
+                      <div className="form-group">
+                          <label className="form-label">Photo de l'employé</label>
+                          <div className="photo-upload-container">
+                              <div className="photo-upload-area">
+                                  <input 
+                                      type="file" 
+                                      id="photo" 
+                                      name="photo"
+                                      accept="image/*"
+                                      onChange={handlePhotoChange}
+                                      className="photo-input"
+                                  />
+                                  <label htmlFor="photo" className="photo-upload-label">
+                                      <i className="fas fa-camera"></i>
+                                      <span>Cliquez pour sélectionner une photo</span>
+                                      <small>Formats acceptés: JPEG, PNG, GIF, WebP (max 5MB)</small>
+                                  </label>
+                              </div>
+                              
+                              {photoPreview && (
+                                  <div className="photo-preview">
+                                      <img src={photoPreview} alt="Aperçu" className="preview-image" />
+                                      <button 
+                                          type="button" 
+                                          className="btn btn-sm btn-danger remove-photo-btn"
+                                          onClick={removePhoto}
+                                      >
+                                          <i className="fas fa-times"></i> Supprimer
+                                      </button>
+                                  </div>
+                              )}
                           </div>
                       </div>
 

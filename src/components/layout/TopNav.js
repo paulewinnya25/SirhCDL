@@ -1,33 +1,60 @@
-import React, { useState, useEffect } from 'react';
-import MessageBox from './MessageBox';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { searchService } from '../../services/api';
 import UserDropdown from './UserDropdown';
-import NotificationsDropdown from './NotificationsDropdown';
 import '../../styles/TopNav.css';
 
 const TopNav = ({ 
   toggleSidebar, 
-  toggleMessageBox, 
-  toggleUserDropdown, 
-  toggleNotificationsDropdown, 
-  user 
+  user,
+  onLogout 
 }) => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [showMessageBox, setShowMessageBox] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  // Debug: Log user data
+  // Refs for click outside detection
+  const searchRef = useRef(null);
+  const userRef = useRef(null);
+
+  // Handle clicks outside dropdowns
   useEffect(() => {
-    console.log('TopNav - User data:', user);
-  }, [user]);
+    const handleClickOutside = (event) => {
+      // Close search results
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setIsSearchFocused(false);
+        setSearchResults([]);
+      }
 
-  const handleSearch = (e) => {
+      // Close user dropdown
+      if (userRef.current && !userRef.current.contains(event.target)) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Search functionality
+  const handleSearch = async (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      console.log('Searching for:', searchQuery);
-      // TODO: Implement actual search functionality
-      // You can add search logic here or emit an event
+      setIsSearching(true);
+      try {
+        const results = await searchService.search(searchQuery);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
     }
   };
 
@@ -36,7 +63,32 @@ const TopNav = ({
   };
 
   const handleSearchBlur = () => {
+    // Delay to allow clicking on search results
+    setTimeout(() => {
+      setIsSearchFocused(false);
+      setSearchResults([]);
+    }, 200);
+  };
+
+  const handleSearchResultClick = (result) => {
+    setSearchQuery('');
+    setSearchResults([]);
     setIsSearchFocused(false);
+    
+    // Navigate based on result type
+    switch (result.type) {
+      case 'employee':
+        navigate(`/employees/${result.id}`);
+        break;
+      case 'contract':
+        navigate('/contrats');
+        break;
+      case 'note':
+        navigate('/service-notes');
+        break;
+      default:
+        break;
+    }
   };
 
   const getInitials = (name) => {
@@ -49,44 +101,28 @@ const TopNav = ({
       .substring(0, 2);
   };
 
-  const handleNotificationClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('Notification button clicked');
-    setShowNotificationsDropdown(!showNotificationsDropdown);
-    setShowUserDropdown(false);
-    setShowMessageBox(false);
-  };
-
-  const handleMessageClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('Message button clicked');
-    setShowMessageBox(!showMessageBox);
-    setShowUserDropdown(false);
-    setShowNotificationsDropdown(false);
-  };
-
   const handleUserProfileClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('User profile clicked');
     setShowUserDropdown(!showUserDropdown);
-    setShowMessageBox(false);
-    setShowNotificationsDropdown(false);
   };
 
   const handleSidebarToggle = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('Sidebar toggle clicked');
     toggleSidebar();
+  };
+
+  const handleLogout = () => {
+    setShowUserDropdown(false);
+    if (onLogout) {
+      onLogout();
+    }
   };
 
   // Get user display info with fallbacks
   const userName = user?.name || user?.nom || user?.prenom || 'Admin RH';
   const userRole = user?.role || user?.poste || user?.fonction || 'Administration';
-  const userEmail = user?.email || 'admin@centre-diagnostic.com';
 
   return (
     <div className="top-nav-container">
@@ -99,7 +135,7 @@ const TopNav = ({
           <i className="fas fa-bars"></i>
         </button>
         
-        <div className="top-nav-search">
+        <div className="top-nav-search" ref={searchRef}>
           <form onSubmit={handleSearch}>
             <input 
               type="text" 
@@ -111,76 +147,83 @@ const TopNav = ({
               onBlur={handleSearchBlur}
             />
             <button type="submit" className="search-submit" title="Rechercher">
-              <i className="fas fa-search search-icon"></i>
+              <i className={`fas ${isSearching ? 'fa-spinner fa-spin' : 'fa-search'} search-icon`}></i>
             </button>
           </form>
+          
+          {/* Search Results Dropdown */}
+          {isSearchFocused && (searchResults.length > 0 || isSearching) && (
+            <div className="search-results-dropdown">
+              {isSearching ? (
+                <div className="search-loading">
+                  <i className="fas fa-spinner fa-spin"></i>
+                  <span>Recherche en cours...</span>
+                </div>
+              ) : searchResults.length > 0 ? (
+                <div className="search-results-list">
+                  {searchResults.map((result) => (
+                    <div 
+                      key={result.id}
+                      className="search-result-item"
+                      onClick={() => handleSearchResultClick(result)}
+                    >
+                      <div className="search-result-icon">
+                        <i className={`fas ${
+                          result.type === 'employee' ? 'fa-user' :
+                          result.type === 'contract' ? 'fa-file-signature' :
+                          'fa-file-alt'
+                        }`}></i>
+                      </div>
+                      <div className="search-result-content">
+                        <div className="search-result-title">{result.name}</div>
+                        <div className="search-result-subtitle">
+                          {result.email || result.status || result.category || result.department}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : searchQuery.trim() && (
+                <div className="search-no-results">
+                  <i className="fas fa-search"></i>
+                  <span>Aucun résultat trouvé</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         
         <div className="top-nav-actions">
-          <button 
-            className="nav-action-btn notification-btn" 
-            id="notificationBtn"
-            onClick={handleNotificationClick}
-            title="Notifications"
-          >
-            <i className="fas fa-bell"></i>
-            <span className="badge-pill">3</span>
-          </button>
-          
-          <button 
-            className="nav-action-btn message-btn" 
-            id="messageBtn"
-            onClick={handleMessageClick}
-            title="Messages"
-          >
-            <i className="fas fa-comments"></i>
-            <span className="badge-pill">5</span>
-          </button>
-          
-          <div 
-            className="user-profile" 
-            id="userProfile" 
-            onClick={handleUserProfileClick}
-            title="Menu utilisateur"
-          >
-            <div className="user-avatar">
-              {getInitials(userName)}
-            </div>
-            <div className="user-info">
-              <div className="user-name">
-                {userName}
+          <div ref={userRef}>
+            <div 
+              className="user-profile" 
+              id="userProfile" 
+              onClick={handleUserProfileClick}
+              title="Menu utilisateur"
+            >
+              <div className="user-avatar">
+                {getInitials(userName)}
               </div>
-              <div className="user-title">
-                {userRole}
+              <div className="user-info">
+                <div className="user-name">
+                  {userName}
+                </div>
+                <div className="user-title">
+                  {userRole}
+                </div>
               </div>
+              <i className="fas fa-chevron-down user-dropdown-arrow"></i>
             </div>
-            <i className="fas fa-chevron-down user-dropdown-arrow"></i>
+            
+            {showUserDropdown && (
+              <UserDropdown 
+                user={user}
+                onLogout={handleLogout}
+              />
+            )}
           </div>
         </div>
       </nav>
-
-      {/* Dropdowns positioned relative to TopNav */}
-      {showNotificationsDropdown && (
-        <NotificationsDropdown />
-      )}
-      
-      {showUserDropdown && (
-        <UserDropdown 
-          user={user}
-          onLogout={() => {
-            // Handle logout if needed
-            console.log('Logout clicked');
-          }}
-        />
-      )}
-      
-      {showMessageBox && (
-        <MessageBox 
-          gmailAuthenticated={true}
-          gmailEmails={[]}
-          onClose={() => setShowMessageBox(false)}
-        />
-      )}
     </div>
   );
 };

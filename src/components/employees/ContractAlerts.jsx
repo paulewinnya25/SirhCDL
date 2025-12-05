@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { decodeHtmlEntities } from '../../utils/textUtils';
 import './ContractAlerts.css';
@@ -25,13 +25,6 @@ const ContractAlerts = () => {
     if (daysRemaining < 15) return 'status-critical';
     if (daysRemaining < 30) return 'status-warning';
     return 'status-ok';
-  };
-
-  const getStatusLabel = (daysRemaining) => {
-    if (daysRemaining < 0) return 'Expiré';
-    if (daysRemaining < 15) return 'Critique';
-    if (daysRemaining < 30) return 'Avertissement';
-    return 'À venir';
   };
 
   // Format date to DD/MM/YYYY
@@ -83,18 +76,6 @@ const ContractAlerts = () => {
     }
   };
 
-  // Jouer le son d'alerte
-  const playAlertSound = () => {
-    if (soundLoaded && !audioError) {
-      const success = createAlertSound();
-      if (success) {
-        console.log("Son d'alerte joué avec succès");
-        setSoundPlayed(true);
-      } else {
-        console.warn("Impossible de jouer le son");
-      }
-    }
-  };
 
   // Initialiser l'audio au montage
   useEffect(() => {
@@ -127,7 +108,7 @@ const ContractAlerts = () => {
       try {
         setLoading(true);
         
-        const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+        const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
         const token = sessionStorage.getItem('token');
         
         const headers = {
@@ -185,7 +166,14 @@ const ContractAlerts = () => {
 
       if ((expiredCount > 0 || criticalCount > 0) && !soundPlayed) {
         const timeoutId = setTimeout(() => {
-          playAlertSound();
+          // Jouer le son d'alerte directement
+          const success = createAlertSound();
+          if (success) {
+            console.log("Son d'alerte joué avec succès");
+            setSoundPlayed(true);
+          } else {
+            console.warn("Impossible de jouer le son");
+          }
         }, 1000);
         
         return () => clearTimeout(timeoutId);

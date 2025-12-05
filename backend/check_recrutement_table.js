@@ -76,3 +76,11 @@ async function checkRecrutementTable() {
 }
 
 checkRecrutementTable().catch(console.error);
+
+
+
+
+
+
+
+

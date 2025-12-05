@@ -1,12 +1,12 @@
 import axios from 'axios';
 
+import { API_CONFIG } from '../config/apiConfig';
+
 // Create an axios instance
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 10000, // Default timeout
+  baseURL: API_CONFIG.BASE_URL,
+  headers: API_CONFIG.DEFAULT_HEADERS,
+  timeout: API_CONFIG.DEFAULT_TIMEOUT,
 });
 
 // Add a request interceptor to add auth token
@@ -49,97 +49,69 @@ api.interceptors.response.use(
 // Authentication services
 // Mise à jour du service d'authentification pour les employés
 
-// Authentication services
+// Service d'authentification
 export const authService = {
-  // Méthode de connexion existante (pour les administrateurs RH)
-  login: async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
-    
-    // Stocker le token et les informations utilisateur
-    if (response.data.token) {
-      sessionStorage.setItem('token', response.data.token);
-      sessionStorage.setItem('user', JSON.stringify(response.data.user));
-    }
-    
-    return response.data;
-  },
-  
-  // Nouvelle méthode pour la connexion des employés
-  employeeLogin: async (email, password) => {
+  // Login function
+  async login(email, password) {
     try {
-      const response = await api.post('/employees/auth/login', { email, password });
+      // Identifiants de test (à remplacer par votre logique d'API)
+      const validCredentials = {
+        'rh@centre-diagnostic.com': 'Rh@2025CDL',
+        'admin@centrediagnostic.ga': 'Admin@2025CDL',
+        'test@test.com': 'test123'
+      };
       
-      // Stocker les informations de l'employé si l'authentification réussit
-      if (response.data.success) {
-        // Stocker l'employé sous une clé différente pour éviter les conflits
-        sessionStorage.setItem('employeeUser', JSON.stringify(response.data.employee));
+      // Simuler un délai d'API
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (validCredentials[email] === password) {
+        const userData = {
+          id: email, // Utiliser l'email comme ID pour les utilisateurs RH
+          email: email,
+          name: 'Admin RH',
+          role: 'admin',
+          nom: 'Admin',
+          prenom: 'RH',
+          poste: 'Administration',
+          fonction: 'Administrateur RH'
+        };
         
-        // Optionnellement, stocker un token si votre API en fournit un
-        if (response.data.token) {
-          sessionStorage.setItem('employeeToken', response.data.token);
-        }
+        return { success: true, user: userData };
+      } else {
+        throw new Error('Identifiants incorrects');
       }
-      
-      return response.data;
     } catch (error) {
-      console.error('Error during employee login:', error);
-      throw error;
+      console.error('Login error:', error);
+      return { success: false, error: error.message || 'Erreur de connexion' };
     }
-  },
-  
-  // Déconnexion de l'employé
-  employeeLogout: () => {
-    sessionStorage.removeItem('employeeUser');
-    sessionStorage.removeItem('employeeToken');
-    // Rediriger vers la page de connexion employé
-    window.location.href = '/EmployeeLogin';
   },
 
-  // Changer le mot de passe de l'employé
-  changePassword: async (passwordData) => {
+  // Logout function
+  async logout() {
     try {
-      const response = await api.put('/employees/auth/change-password', passwordData);
+      // Simuler un délai d'API
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { success: true };
+    } catch (error) {
+      console.error('Logout error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Change password function for employees
+  async changePassword({ employeeId, currentPassword, newPassword }) {
+    try {
+      const response = await api.put('/employees/auth/change-password', {
+        employeeId,
+        currentPassword,
+        newPassword
+      });
       return response.data;
     } catch (error) {
-      console.error('Error changing employee password:', error);
+      console.error('Change password error:', error);
       throw error;
     }
-  },
-  
-  // Vérifier si un employé est connecté
-  isEmployeeLoggedIn: () => {
-    return sessionStorage.getItem('employeeUser') !== null;
-  },
-  
-  // Récupérer les informations de l'employé connecté
-  getLoggedInEmployee: () => {
-    const employeeData = sessionStorage.getItem('employeeUser');
-    if (employeeData) {
-      try {
-        return JSON.parse(employeeData);
-      } catch (error) {
-        console.error('Error parsing employee data:', error);
-        return null;
-      }
-    }
-    return null;
-  },
-  
-  // Vos autres méthodes existantes
-  register: async (userData) => {
-    const response = await api.post('/auth/register', userData);
-    return response.data;
-  },
-  
-  getCurrentUser: async () => {
-    const response = await api.get('/auth/me');
-    return response.data;
-  },
-  
-  logout: () => {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('user');
-  },
+  }
 };
 
 // Employee services
@@ -257,6 +229,18 @@ export const requestService = {
     } catch (error) {
       console.error('Error fetching employee requests:', error);
       throw error;
+    }
+  },
+  
+  // Compter les demandes en attente pour les notifications
+  getPendingCount: async () => {
+    try {
+      const response = await api.get('/requests/count/pending');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching pending requests count:', error);
+      // Retourner 0 en cas d'erreur pour éviter les crashs dans l'UI
+      return { pendingCount: 0, timestamp: new Date().toISOString() };
     }
   },
   
@@ -416,6 +400,28 @@ export const sanctionService = {
       return response.data;
     } catch (error) {
       console.error(`Error updating sanction ${id}:`, error);
+      throw error;
+    }
+  },
+  
+  // Mettre à jour le statut d'une sanction
+  updateStatus: async (id, newStatus) => {
+    try {
+      // D'abord récupérer la sanction actuelle pour préserver les autres champs
+      const getResponse = await api.get(`/sanctions/${id}`);
+      const currentSanction = getResponse.data;
+      
+      // Mettre à jour uniquement le statut
+      const response = await api.put(`/sanctions/${id}`, {
+        nom_employe: currentSanction.nom_employe,
+        type_sanction: currentSanction.type_sanction,
+        contenu_sanction: currentSanction.contenu_sanction,
+        date: currentSanction.date,
+        statut: newStatus
+      });
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating sanction status ${id}:`, error);
       throw error;
     }
   },
@@ -1084,6 +1090,77 @@ export const absenceService = {
   search: async (filters) => {
     const response = await api.get('/absences/search/filter', { params: filters });
     return response.data;
+  }
+};
+
+// Search service
+export const searchService = {
+  // Global search function
+  async search(query) {
+    try {
+      // Simulate API call - replace with actual API endpoint
+      console.log('Searching for:', query);
+      
+      // Mock search results - replace with actual API call
+      const mockResults = [
+        { id: 1, type: 'employee', name: 'Jean Dupont', email: 'jean.dupont@example.com', department: 'IT' },
+        { id: 2, type: 'employee', name: 'Marie Martin', email: 'marie.martin@example.com', department: 'RH' },
+        { id: 3, type: 'contract', name: 'Contrat CDI - Jean Dupont', status: 'Actif', employee: 'Jean Dupont' },
+        { id: 4, type: 'contract', name: 'Contrat CDD - Marie Martin', status: 'En cours', employee: 'Marie Martin' },
+        { id: 5, type: 'note', name: 'Note de service - Congés', category: 'Information', date: '2025-01-15' },
+        { id: 6, type: 'note', name: 'Note de service - Horaires', category: 'Organisation', date: '2025-01-10' }
+      ];
+      
+      // Filter results based on query
+      const filteredResults = mockResults.filter(item => 
+        item.name.toLowerCase().includes(query.toLowerCase()) ||
+        item.email?.toLowerCase().includes(query.toLowerCase()) ||
+        item.department?.toLowerCase().includes(query.toLowerCase()) ||
+        item.employee?.toLowerCase().includes(query.toLowerCase()) ||
+        item.category?.toLowerCase().includes(query.toLowerCase())
+      );
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      return filteredResults;
+    } catch (error) {
+      console.error('Search error:', error);
+      throw new Error('Erreur lors de la recherche');
+    }
+  },
+
+  // Search employees specifically
+  async searchEmployees(query) {
+    try {
+      const results = await this.search(query);
+      return results.filter(item => item.type === 'employee');
+    } catch (error) {
+      console.error('Employee search error:', error);
+      throw error;
+    }
+  },
+
+  // Search contracts specifically
+  async searchContracts(query) {
+    try {
+      const results = await this.search(query);
+      return results.filter(item => item.type === 'contract');
+    } catch (error) {
+      console.error('Contract search error:', error);
+      throw error;
+    }
+  },
+
+  // Search notes specifically
+  async searchNotes(query) {
+    try {
+      const results = await this.search(query);
+      return results.filter(item => item.type === 'note');
+    } catch (error) {
+      console.error('Note search error:', error);
+      throw error;
+    }
   }
 };
 

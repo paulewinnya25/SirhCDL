@@ -87,3 +87,11 @@ async function fixContratsForAllEmployees() {
 }
 
 fixContratsForAllEmployees().catch(console.error);
+
+
+
+
+
+
+
+

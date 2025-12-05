@@ -1,8 +1,52 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const AutoNotificationService = require('../services/autoNotificationService');
+
+// Configuration de multer pour l'upload de fichiers
+const storage = multer.diskStorage({
+    destination: function(req, file, cb) {
+        const uploadDir = path.join(__dirname, '../uploads/conges');
+        
+        // Créer le dossier s'il n'existe pas
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        
+        cb(null, uploadDir);
+    },
+    filename: function(req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        cb(null, 'conge-' + uniqueSuffix + ext);
+    }
+});
+
+// Filtre pour les types de fichiers acceptés
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    
+    if (allowedTypes.includes(ext)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Type de fichier non supporté. Seuls PDF, JPG et PNG sont acceptés.'), false);
+    }
+};
+
+const upload = multer({ 
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB max
+    }
+});
 
 // Exportez une fonction qui prend l'objet pool comme argument
 module.exports = (pool) => {
     const router = express.Router();
+    const autoNotificationService = new AutoNotificationService(pool);
 
     // Récupérer tous les congés
     router.get('/', async (req, res) => {
@@ -20,8 +64,13 @@ module.exports = (pool) => {
     });
 
     // Créer un nouveau congé
-    router.post('/', async (req, res) => {
+    router.post('/', upload.single('document'), async (req, res) => {
         try {
+            // Debug: Afficher les données reçues
+            console.log('📥 Données reçues pour création de congé:');
+            console.log('📋 req.body:', JSON.stringify(req.body, null, 2));
+            console.log('📋 req.file:', req.file);
+            
             const { 
                 nom_employe, 
                 service, 
@@ -36,9 +85,62 @@ module.exports = (pool) => {
                 jours_pris,
                 jours_restants,
                 date_prochaine_attribution,
-                type_conge,
-                document_path
+                type_conge
             } = req.body;
+
+            // Debug: Afficher les dates extraites
+            console.log('📅 Dates extraites:');
+            console.log('📅 date_debut:', date_debut, 'Type:', typeof date_debut);
+            console.log('📅 date_fin:', date_fin, 'Type:', typeof date_fin);
+            console.log('📅 date_retour:', date_retour, 'Type:', typeof date_retour);
+            console.log('📅 date_embauche:', date_embauche, 'Type:', typeof date_embauche);
+            console.log('📅 date_demande:', date_demande, 'Type:', typeof date_demande);
+            console.log('📅 date_prochaine_attribution:', date_prochaine_attribution, 'Type:', typeof date_prochaine_attribution);
+
+            // Chemin du document uploadé, s'il existe
+            const documentPath = req.file ? `/uploads/conges/${req.file.filename}` : null;
+
+            // Fonction pour nettoyer et valider les dates
+            const cleanDate = (dateValue) => {
+                if (!dateValue) return null;
+                
+                // Si c'est un objet ou un tableau, essayer d'extraire la première valeur
+                if (typeof dateValue === 'object') {
+                    if (Array.isArray(dateValue)) {
+                        dateValue = dateValue[0];
+                    } else if (dateValue.toString) {
+                        dateValue = dateValue.toString();
+                    } else {
+                        return null;
+                    }
+                }
+                
+                // Si c'est une string, essayer de la parser
+                if (typeof dateValue === 'string') {
+                    const date = new Date(dateValue);
+                    if (!isNaN(date.getTime())) {
+                        return date.toISOString().split('T')[0];
+                    }
+                }
+                
+                return null;
+            };
+
+            // Nettoyer toutes les dates
+            const cleanDateDebut = cleanDate(date_debut);
+            const cleanDateFin = cleanDate(date_fin);
+            const cleanDateRetour = cleanDate(date_retour);
+            const cleanDateEmbauche = cleanDate(date_embauche);
+            const cleanDateDemande = cleanDate(date_demande) || new Date().toISOString().split('T')[0];
+            const cleanDateProchaineAttribution = cleanDate(date_prochaine_attribution);
+
+            console.log('🧹 Dates nettoyées:');
+            console.log('🧹 date_debut:', cleanDateDebut);
+            console.log('🧹 date_fin:', cleanDateFin);
+            console.log('🧹 date_retour:', cleanDateRetour);
+            console.log('🧹 date_embauche:', cleanDateEmbauche);
+            console.log('🧹 date_demande:', cleanDateDemande);
+            console.log('🧹 date_prochaine_attribution:', cleanDateProchaineAttribution);
 
             const query = `
                 INSERT INTO conges 
@@ -53,23 +155,52 @@ module.exports = (pool) => {
                 nom_employe, 
                 service || null, 
                 poste || null,
-                date_embauche || null,
+                cleanDateEmbauche,
                 jours_conges_annuels || null,
-                date_demande || new Date(),
-                date_debut, 
-                date_fin,
+                cleanDateDemande,
+                cleanDateDebut, 
+                cleanDateFin,
                 motif || null,
-                date_retour || null,
+                cleanDateRetour,
                 jours_pris || null,
                 jours_restants || null,
-                date_prochaine_attribution || null,
+                cleanDateProchaineAttribution,
                 type_conge || 'Congé payé',
                 'En attente', // Statut par défaut
-                document_path || null
+                documentPath
             ];
 
             const result = await pool.query(query, values);
-            res.status(201).json(result.rows[0]);
+            const newConge = result.rows[0];
+
+            // Créer des notifications automatiques pour les RH et responsables
+            try {
+                // Récupérer l'ID de l'employé à partir du nom
+                const employeeQuery = `SELECT id FROM employees WHERE nom_prenom ILIKE $1 LIMIT 1`;
+                const employeeResult = await pool.query(employeeQuery, [`%${nom_employe}%`]);
+                
+                if (employeeResult.rows.length > 0) {
+                    const employeeId = employeeResult.rows[0].id;
+                    
+                    await autoNotificationService.createRequestNotification({
+                        request_id: newConge.id,
+                        employee_id: employeeId,
+                        request_type: 'leave_request',
+                        title: `Demande de congé - ${nom_employe}`,
+                        description: `Demande de congé du ${cleanDateDebut} au ${cleanDateFin}. Motif: ${motif || 'Non spécifié'}`,
+                        priority: 'high'
+                    });
+                    
+                    console.log(`📢 Notification automatique créée pour la demande de congé de ${nom_employe}`);
+                } else {
+                    console.log(`⚠️ Employé ${nom_employe} non trouvé pour la notification automatique`);
+                }
+            } catch (notificationError) {
+                console.error('❌ Erreur lors de la création de notification automatique:', notificationError);
+                // Ne pas faire échouer la création de congé si la notification échoue
+            }
+
+            res.status(201).json(newConge);
         } catch (err) {
             console.error('Error creating conge:', err);
             res.status(500).json({ error: 'Failed to create conge', details: err.message });
@@ -108,7 +239,7 @@ module.exports = (pool) => {
     });
 
     // Mettre à jour un congé
-    router.put('/:id', async (req, res) => {
+    router.put('/:id', upload.single('document'), async (req, res) => {
         try {
             const { id } = req.params;
             const { 
@@ -126,9 +257,11 @@ module.exports = (pool) => {
                 jours_restants,
                 date_prochaine_attribution,
                 type_conge,
-                statut,
-                document_path
+                statut
             } = req.body;
+
+            // Chemin du document uploadé, s'il existe
+            const documentPath = req.file ? `/uploads/conges/${req.file.filename}` : null;
 
             const query = `
                 UPDATE conges 
@@ -168,7 +301,7 @@ module.exports = (pool) => {
                 date_prochaine_attribution || null,
                 type_conge || 'Congé payé',
                 statut || 'En attente',
-                document_path || null,
+                documentPath,
                 id
             ];
 

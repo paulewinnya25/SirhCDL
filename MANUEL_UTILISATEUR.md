@@ -602,3 +602,11 @@ Le tableau de bord offre une vision complète de l'état de l'organisation avec 
 **Date de mise à jour** : Décembre 2024  
 **Auteur** : Équipe IT Centre Diagnostic
 
+
+
+
+
+
+
+
+

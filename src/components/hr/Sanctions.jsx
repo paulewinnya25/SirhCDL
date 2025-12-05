@@ -18,6 +18,7 @@ const SanctionManagement = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [sanctionToCancel, setSanctionToCancel] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [error, setError] = useState(null);
@@ -301,15 +302,13 @@ const SanctionManagement = () => {
       };
       
       // Send data to API
-      const response = await sanctionService.update(values.id, sanctionData);
+      const response = await sanctionService.update(sanctionData.id, sanctionData);
       
       // Update the sanction in the list
-      setSanctions(prev => prev.map(s => s.id === values.id ? response : s));
+      setSanctions(prev => prev.map(s => s.id === response.id ? response : s));
       
       // Success
       showNotification('Sanction mise à jour avec succès!');
-      
-      // Close modal
       setShowEditModal(false);
     } catch (error) {
       console.error('Error updating sanction:', error);
@@ -317,6 +316,33 @@ const SanctionManagement = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle delete sanction
+  const handleDeleteSanction = async (sanctionId) => {
+    try {
+      // Call API to delete sanction
+      await sanctionService.delete(sanctionId);
+      
+      // Remove from local state
+      setSanctions(prev => prev.filter(s => s.id !== sanctionId));
+      
+      // Success notification
+      showNotification('Sanction supprimée avec succès!', 'success');
+      
+      // Close delete modal
+      setShowDeleteModal(false);
+      setSelectedSanction(null);
+    } catch (error) {
+      console.error('Error deleting sanction:', error);
+      setError('Erreur lors de la suppression de la sanction. Veuillez réessayer.');
+    }
+  };
+
+  // Open delete modal
+  const openDeleteModal = (sanction) => {
+    setSelectedSanction(sanction);
+    setShowDeleteModal(true);
   };
 
   // Handle view sanction details
@@ -463,8 +489,41 @@ const SanctionManagement = () => {
     <>
       <div className="page-title-wrapper">
         <div className="title-content">
-          <h1 className="page-title">Gestion des sanctions</h1>
-          <p className="page-subtitle">Gérez les sanctions disciplinaires des employés.</p>
+          <div className="bg-primary text-white p-4 rounded mb-3" style={{background: 'linear-gradient(135deg, #3a7bd5, #00d1b2)'}}>
+            <div className="d-flex justify-content-between align-items-start">
+              <div>
+                <h1 className="h2 mb-2 text-white">Gestion des sanctions</h1>
+                <p className="text-white mb-3 opacity-75 fs-5">Gérez les sanctions disciplinaires des employés de votre entreprise</p>
+                <div className="d-flex flex-wrap gap-2">
+                  <span className="badge bg-white text-primary fs-6 px-3 py-2">
+                    <i className="fas fa-gavel me-2"></i>
+                    {stats.total} Sanctions totales
+                  </span>
+                  <span className="badge bg-warning text-dark fs-6 px-3 py-2">
+                    <i className="fas fa-clock me-2"></i>
+                    {stats.enCours} En cours
+                  </span>
+                  <span className="badge bg-success fs-6 px-3 py-2">
+                    <i className="fas fa-check-circle me-2"></i>
+                    {stats.terminee} Terminées
+                  </span>
+                  <span className="badge bg-danger fs-6 px-3 py-2">
+                    <i className="fas fa-ban me-2"></i>
+                    {stats.annulee} Annulées
+                  </span>
+                </div>
+              </div>
+              <div className="d-flex gap-2">
+                <button 
+                  className="btn btn-light text-primary"
+                  onClick={() => setShowModal(true)}
+                >
+                  <i className="fas fa-plus me-2"></i>
+                  Nouvelle sanction
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -484,68 +543,43 @@ const SanctionManagement = () => {
         </div>
       )}
 
-      {/* Dashboard Stats */}
-      <div className="row stats-dashboard mb-4">
-        <div className="col-md-3">
-          <div className="stat-card bg-primary text-white">
-            <div className="stat-card-body">
-              <h5 className="stat-card-title">Total des sanctions</h5>
-              <div className="stat-card-value">{stats.total}</div>
-              <div className="stat-card-icon">
-                <i className="fas fa-gavel"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="col-md-3">
-          <div className="stat-card bg-warning text-dark">
-            <div className="stat-card-body">
-              <h5 className="stat-card-title">En cours</h5>
-              <div className="stat-card-value">{stats.enCours}</div>
-              <div className="stat-card-icon">
-                <i className="fas fa-clock"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="col-md-3">
-          <div className="stat-card bg-success text-white">
-            <div className="stat-card-body">
-              <h5 className="stat-card-title">Terminées</h5>
-              <div className="stat-card-value">{stats.terminee}</div>
-              <div className="stat-card-icon">
-                <i className="fas fa-check-circle"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="col-md-3">
-          <div className="stat-card bg-danger text-white">
-            <div className="stat-card-body">
-              <h5 className="stat-card-title">Annulées</h5>
-              <div className="stat-card-value">{stats.annulee}</div>
-              <div className="stat-card-icon">
-                <i className="fas fa-ban"></i>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Dashboard Stats - Supprimé */}
 
-      <div className="card table-card mb-4">
-        <div className="card-header d-flex justify-content-between align-items-center">
+      <div className="card table-card mb-4" style={{border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderRadius: '16px'}}>
+        <div className="card-header d-flex justify-content-between align-items-center" style={{
+          backgroundColor: '#f8f9fa', 
+          borderBottom: '2px solid #e9ecef',
+          borderRadius: '16px 16px 0 0',
+          padding: '1.5rem'
+        }}>
           <div className="d-flex align-items-center">
-            <div className="card-icon">
-              <i className="fas fa-gavel"></i>
+            <div className="card-icon me-3" style={{
+              width: '50px',
+              height: '50px',
+              backgroundColor: 'linear-gradient(135deg, #3a7bd5, #00d1b2)',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, #3a7bd5, #00d1b2)'
+            }}>
+              <i className="fas fa-gavel text-white fs-4"></i>
             </div>
-            <h3 className="card-title">Sanctions disciplinaires</h3>
+            <div>
+              <h3 className="card-title mb-1" style={{color: '#2c3e50', fontWeight: '600'}}>Sanctions disciplinaires</h3>
+              <p className="text-muted mb-0" style={{fontSize: '0.9rem'}}>Gérez et suivez toutes les sanctions de votre équipe</p>
+            </div>
           </div>
           <button 
             className="btn btn-primary" 
             onClick={() => setShowModal(true)}
+            style={{
+              background: 'linear-gradient(135deg, #3a7bd5, #00d1b2)',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '0.75rem 1.5rem',
+              fontWeight: '600'
+            }}
           >
             <i className="fas fa-plus me-2"></i>
             Nouvelle sanction
@@ -554,28 +588,37 @@ const SanctionManagement = () => {
         
         <div className="card-body">
           {/* Filters */}
-          <div className="filters-container mb-4">
+          <div className="filters-container mb-4" style={{
+            backgroundColor: '#f8f9fa',
+            padding: '1.5rem',
+            borderRadius: '12px',
+            border: '1px solid #e9ecef'
+          }}>
             <div className="row g-3">
               <div className="col-md-4">
                 <div className="input-group">
-                  <span className="input-group-text"><i className="fas fa-search"></i></span>
+                  <span className="input-group-text bg-white border-end-0" style={{borderColor: '#dee2e6'}}>
+                    <i className="fas fa-search text-muted"></i>
+                  </span>
                   <input 
                     type="text" 
                     placeholder="Rechercher par employé..." 
-                    className="form-control" 
+                    className="form-control border-start-0" 
                     name="employee"
                     value={searchParams.employee}
                     onChange={handleSearchChange}
+                    style={{borderColor: '#dee2e6'}}
                   />
                 </div>
               </div>
               
               <div className="col-md-2">
                 <select 
-                  className="form-select"
+                  className="form-select border-0 shadow-sm"
                   name="type"
                   value={searchParams.type}
                   onChange={handleSearchChange}
+                  style={{backgroundColor: 'white', border: '1px solid #dee2e6'}}
                 >
                   <option value="">Tous les types</option>
                   {sanctionTypes.map((type, index) => (
@@ -586,10 +629,11 @@ const SanctionManagement = () => {
               
               <div className="col-md-2">
                 <select 
-                  className="form-select"
+                  className="form-select border-0 shadow-sm"
                   name="status"
                   value={searchParams.status}
                   onChange={handleSearchChange}
+                  style={{backgroundColor: 'white', border: '1px solid #dee2e6'}}
                 >
                   <option value="">Tous les statuts</option>
                   {statutsList.map((statut, index) => (
@@ -600,8 +644,9 @@ const SanctionManagement = () => {
               
               <div className="col-md-2">
                 <button 
-                  className="btn btn-outline-secondary w-100"
+                  className="btn btn-outline-secondary w-100 shadow-sm"
                   onClick={resetFilters}
+                  style={{borderColor: '#dee2e6', color: '#6c757d', backgroundColor: 'white'}}
                 >
                   <i className="fas fa-filter-circle-xmark me-2"></i>
                   Réinitialiser
@@ -609,30 +654,67 @@ const SanctionManagement = () => {
               </div>
             </div>
             
-            <div className="row g-3 mt-1">
+            <div className="row g-3 mt-3">
               <div className="col-md-3">
                 <div className="input-group">
-                  <span className="input-group-text">Du</span>
+                  <span className="input-group-text bg-white border-end-0" style={{borderColor: '#dee2e6'}}>
+                    <i className="fas fa-calendar text-muted"></i>
+                  </span>
                   <input 
                     type="date" 
-                    className="form-control" 
+                    className="form-control border-start-0" 
                     name="dateStart"
                     value={searchParams.dateStart}
                     onChange={handleSearchChange}
+                    style={{borderColor: '#dee2e6'}}
                   />
                 </div>
               </div>
               
               <div className="col-md-3">
                 <div className="input-group">
-                  <span className="input-group-text">Au</span>
+                  <span className="input-group-text bg-white border-end-0" style={{borderColor: '#dee2e6'}}>
+                    <i className="fas fa-calendar text-muted"></i>
+                  </span>
                   <input 
                     type="date" 
-                    className="form-control" 
+                    className="form-control border-start-0" 
                     name="dateEnd"
                     value={searchParams.dateEnd}
                     onChange={handleSearchChange}
+                    style={{borderColor: '#dee2e6'}}
                   />
+                </div>
+              </div>
+              
+              <div className="col-md-6">
+                <div className="d-flex justify-content-end">
+                  <button 
+                    className="btn btn-primary me-2"
+                    onClick={() => {}} // Fonction de recherche avancée
+                    style={{
+                      background: 'linear-gradient(135deg, #3a7bd5, #00d1b2)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.5rem 1rem'
+                    }}
+                  >
+                    <i className="fas fa-search me-2"></i>
+                    Recherche avancée
+                  </button>
+                  <button 
+                    className="btn btn-success"
+                    onClick={() => {}} // Fonction d'export
+                    style={{
+                      background: 'linear-gradient(135deg, #00d1b2, #2bb673)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.5rem 1rem'
+                    }}
+                  >
+                    <i className="fas fa-download me-2"></i>
+                    Exporter
+                  </button>
                 </div>
               </div>
             </div>
@@ -775,7 +857,7 @@ const SanctionManagement = () => {
                                 <i className="fas fa-check"></i>
                               </button>
                               <button 
-                                className="btn btn-sm btn-danger" 
+                                className="btn btn-sm btn-danger me-1" 
                                 onClick={() => handleCancelSanction(sanction)}
                                 title="Annuler la sanction"
                               >
@@ -783,6 +865,14 @@ const SanctionManagement = () => {
                               </button>
                             </>
                           )}
+                          
+                          <button 
+                            className="btn btn-sm btn-outline-danger" 
+                            onClick={() => openDeleteModal(sanction)}
+                            title="Supprimer définitivement"
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1362,6 +1452,78 @@ const SanctionManagement = () => {
         </div>
       )}
 
+      {/* Delete Sanction Modal */}
+      {showDeleteModal && selectedSanction && (
+        <div className="modal-backdrop">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title text-danger">
+                <i className="fas fa-trash me-2"></i>
+                Supprimer la sanction
+              </h5>
+              <button 
+                type="button" 
+                className="btn-close" 
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setSelectedSanction(null);
+                }}
+              ></button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert-danger">
+                <i className="fas fa-exclamation-triangle me-2"></i>
+                <strong>Attention:</strong> La suppression d'une sanction est une action définitive et irréversible.
+              </div>
+              
+              <p>Vous êtes sur le point de supprimer définitivement la sanction suivante:</p>
+              
+              <div className="sanction-summary mb-3">
+                <div className="summary-item">
+                  <strong>Employé:</strong> {selectedSanction.nom_employe}
+                </div>
+                <div className="summary-item">
+                  <strong>Type:</strong> {selectedSanction.type_sanction}
+                </div>
+                <div className="summary-item">
+                  <strong>Date:</strong> {formatDate(selectedSanction.date)}
+                </div>
+                <div className="summary-item">
+                  <strong>Statut:</strong> {selectedSanction.statut}
+                </div>
+              </div>
+              
+              <div className="alert alert-warning">
+                <i className="fas fa-info-circle me-2"></i>
+                <strong>Information:</strong> Cette action supprimera complètement la sanction de la base de données. 
+                Aucune trace ne sera conservée.
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-outline-secondary" 
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setSelectedSanction(null);
+                }}
+              >
+                <i className="fas fa-arrow-left me-2"></i>
+                Annuler
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-danger" 
+                onClick={() => handleDeleteSanction(selectedSanction.id)}
+              >
+                <i className="fas fa-trash me-2"></i>
+                Confirmer la suppression
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Styles CSS supplémentaires */}
       <style>{`
         .modal-backdrop {
@@ -1399,45 +1561,6 @@ const SanctionManagement = () => {
         
         .stats-dashboard {
           margin-bottom: 20px;
-        }
-        
-        .stat-card {
-          border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-          height: 100%;
-          position: relative;
-          overflow: hidden;
-          transition: all 0.3s ease;
-        }
-        
-        .stat-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        }
-        
-        .stat-card-body {
-          padding: 20px;
-          position: relative;
-          z-index: 1;
-        }
-        
-        .stat-card-title {
-          font-size: 14px;
-          margin-bottom: 10px;
-          opacity: 0.8;
-        }
-        
-        .stat-card-value {
-          font-size: 28px;
-          font-weight: bold;
-        }
-        
-        .stat-card-icon {
-          position: absolute;
-          right: 20px;
-          top: 15px;
-          font-size: 30px;
-          opacity: 0.3;
         }
         
         .card-icon {

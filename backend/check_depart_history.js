@@ -72,3 +72,11 @@ async function checkDepartHistory() {
 }
 
 checkDepartHistory().catch(console.error);
+
+
+
+
+
+
+
+

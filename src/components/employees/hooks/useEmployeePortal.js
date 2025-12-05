@@ -60,7 +60,7 @@ export const useEmployeePortal = () => {
       
       if (!userData) {
         console.log("Aucune donnée utilisateur trouvée, redirection vers la page de connexion");
-        navigate('/EmployeeLogin');
+        navigate('/login');
         return;
       }
       
@@ -91,7 +91,7 @@ export const useEmployeePortal = () => {
     } catch (error) {
       console.error('Erreur lors de la vérification de l\'authentification:', error);
       setError('Erreur lors de la vérification de l\'authentification');
-      navigate('/EmployeeLogin');
+      navigate('/login');
     } finally {
       setLoading(false);
     }
@@ -497,6 +497,13 @@ export const useEmployeePortal = () => {
     setShowDocumentViewModal
   };
 };
+
+
+
+
+
+
+
 
 
 

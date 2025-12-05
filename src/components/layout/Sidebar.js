@@ -1,17 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import '../../styles/Sidebar.css';
 
 const Sidebar = ({ collapsed }) => {
   const location = useLocation();
   const [activeMenus, setActiveMenus] = useState({});
+  const { unreadCount } = useUnreadMessages();
   
-  // Define menu structure
-  const menuItems = [
+  console.log('🔍 Sidebar: unreadCount =', unreadCount);
+  
+  // Define menu structure - ORIGINAL COMPLETE STRUCTURE
+  const menuItems = useMemo(() => [
     {
       title: 'Tableau de bord',
       icon: 'fas fa-tachometer-alt',
       path: '/dashboard',
+      subMenu: null
+    },
+    {
+      title: 'Messagerie',
+      icon: 'fas fa-comments',
+      path: '/messaging',
       subMenu: null
     },
     {
@@ -40,8 +50,9 @@ const Sidebar = ({ collapsed }) => {
       path: '#',
       subMenu: [
         { title: 'Ajouter un Employé', path: '/new-employee' },
-        { title: 'Effectif', path: '/employees' }
-       
+        { title: 'Effectif', path: '/employees' },
+        
+        { title: 'Alertes Contrats', path: '/contract-alerts' }
       ]
     },
     {
@@ -53,36 +64,36 @@ const Sidebar = ({ collapsed }) => {
         { title: 'Absences', path: '/absences' }
       ]
     },
-    
     {
-      title: 'Gestion RH',
-      icon: 'fas fa-briefcase',
+      title: 'Contrats',
+      icon: 'fas fa-file-signature',
       path: '#',
       subMenu: [
-        { title: 'Entretiens', path: '/interviews' },
-        { title: 'Démarches RH', path: '/hr-tasks' }
+        { title: 'Gestion des Contrats', path: '/contrats' },
+        { title: 'Gestionnaire PDF', path: '/contrats-pdf' }
       ]
     },
-    
+    {
+      title: 'RH & Performance',
+      icon: 'fas fa-chart-line',
+      path: '#',
+      subMenu: [
+        { title: 'Sanctions', path: '/sanctions' },
+        { title: 'Gestion Performance', path: '/performance-management' },
+        { title: 'Notes de Service', path: '/service-notes' }
+      ]
+    },
     {
       title: 'Recrutement',
       icon: 'fas fa-user-tie',
       path: '#',
       subMenu: [
-        { title: 'Historique de recrutement', path: '/recruitment-history' },
-        { title: 'Suivi procédure', path: '/procedure-tracking' },
+        { title: 'Historique de recrutement', path: '/recruitment-history' },   
         { title: 'Historique de depart', path: '/departure-history' },
-        { title: 'Visites Médicale', path: '/medical-visits' }
-      ]
-    },
-  
-    {
-      title: 'Documents',
-      icon: 'fas fa-file-alt',
-      path: '#',
-      subMenu: [
-        { title: 'Code du travail', path: '/labor-code' },
-        { title: 'Règlement intérieur', path: '/internal-regulations' }
+        { title: 'Visites Médicale', path: '/medical-visits' },
+        { title: 'Entretiens', path: '/interviews' },
+        { title: 'Gestion des Tâches', path: '/tasks' },
+        { title: 'Suivi Procédures', path: '/procedure-tracking' }
       ]
     },
     {
@@ -90,7 +101,7 @@ const Sidebar = ({ collapsed }) => {
       icon: 'fas fa-calendar-check',
       path: '#',
       subMenu: [
-        { title: 'Ajouter évènement', path: '/events' }
+        { title: 'Gestion des Évènements', path: '/events' }
       ]
     },
     {
@@ -101,7 +112,7 @@ const Sidebar = ({ collapsed }) => {
         { title: 'Graphiques', path: '/charts' }
       ]
     }
-  ];
+  ], []);
 
   // Handle menu toggling
   const toggleMenu = (index) => {
@@ -131,7 +142,7 @@ const Sidebar = ({ collapsed }) => {
     });
     
     setActiveMenus(newActiveMenus);
-  }, [location.pathname]);
+  }, [location.pathname, menuItems]);
 
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`} id="sidebar">
@@ -151,18 +162,15 @@ const Sidebar = ({ collapsed }) => {
             {item.subMenu ? (
               // Menu with submenu
               <>
-                <a 
-                  href="#" 
+                <button 
                   className={`nav-link ${isActiveMenuItem(item) ? 'active' : ''}`} 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    toggleMenu(index);
-                  }}
+                  onClick={() => toggleMenu(index)}
+                  style={{ background: 'none', border: 'none', width: '100%', textAlign: 'left' }}
                 >
                   <div className="nav-icon"><i className={item.icon}></i></div>
                   <span className="nav-text">{item.title}</span>
                   {item.subMenu && <i className="fas fa-chevron-right nav-arrow"></i>}
-                </a>
+                </button>
                 
                 {item.subMenu && (
                   <ul className="sub-menu">
@@ -182,11 +190,14 @@ const Sidebar = ({ collapsed }) => {
             ) : (
               // Menu without submenu
               <Link 
-                to={item.path} 
+                to={item.path === '#' ? '/dashboard' : item.path} 
                 className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
               >
                 <div className="nav-icon"><i className={item.icon}></i></div>
                 <span className="nav-text">{item.title}</span>
+                {item.title === 'Messagerie' && unreadCount > 0 && (
+                  <span className="notification-badge">{unreadCount}</span>
+                )}
               </Link>
             )}
           </li>

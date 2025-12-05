@@ -20,18 +20,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #eef5ff;
+    background: #e8f4f8;
     border: none;
     border-radius: 50%;
     cursor: pointer;
     font-size: 1.1rem;
-    color: #3a7bd5;
+    color: #3a8eba;
     transition: all 0.3s ease;
     flex-shrink: 0;
 }
 
 .toggle-sidebar:hover {
-    background: #3a7bd5;
+    background: #3a8eba;
     color: white;
     transform: scale(1.05);
 }
@@ -56,13 +56,13 @@
 
 .search-input:focus {
     outline: none;
-    border-color: #3a7bd5;
+    border-color: #3a8eba;
     background: white;
     box-shadow: 0 0 0 3px rgba(58, 123, 213, 0.1);
 }
 
 .search-input.focused {
-    border-color: #3a7bd5;
+    border-color: #3a8eba;
     background: white;
     box-shadow: 0 0 0 3px rgba(58, 123, 213, 0.1);
 }
@@ -74,13 +74,13 @@
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: #3a7bd5;
+    color: #3a8eba;
     cursor: pointer;
     font-size: 1.1rem;
 }
 
 .search-submit:hover {
-    color: #2c62b0;
+    color: #295785;
 }
 
 .top-nav-actions {
@@ -96,19 +96,19 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #eef5ff;
+    background: #e8f4f8;
     border: none;
     border-radius: 50%;
     cursor: pointer;
     font-size: 1.1rem;
-    color: #3a7bd5;
+    color: #3a8eba;
     position: relative;
     transition: all 0.3s ease;
     flex-shrink: 0;
 }
 
 .nav-action-btn:hover {
-    background: #3a7bd5;
+    background: #3a8eba;
     color: white;
     transform: translateY(-3px);
 }
@@ -163,7 +163,7 @@
 }
 
 .user-profile:hover {
-    background: #3a7bd5;
+    background: #3a8eba;
     color: white;
     transform: translateY(-3px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -181,7 +181,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #3a7bd5, #00d1b2);
+    background: linear-gradient(135deg, #3a8eba, #295785);
     color: white;
     font-weight: 600;
     font-size: 0.9375rem;
@@ -198,7 +198,7 @@
 .user-name {
     font-weight: 600;
     font-size: 0.875rem;
-    color: #3a7bd5;
+    color: #3a8eba;
     transition: all 0.3s ease;
 }
 
@@ -236,7 +236,7 @@
 }
 
 .user-dropdown-header {
-    background: #eef5ff;
+    background: #e8f4f8;
     padding: 1rem;
     border-radius: 10px 10px 0 0;
 }
@@ -260,7 +260,7 @@
 .user-dropdown .user-name {
     font-weight: 600;
     font-size: 1rem;
-    color: #3a7bd5;
+    color: #3a8eba;
     margin-bottom: 5px;
 }
 
@@ -288,7 +288,7 @@
 
 .dropdown-item:hover {
     background-color: #eef5ff;
-    color: #3a7bd5;
+    color: #3a8eba;
 }
 
 .dropdown-divider {
@@ -309,7 +309,7 @@
 }
 
 .notification-header {
-    background: #3a7bd5;
+    background: #3a8eba;
     color: white;
     padding: 1rem;
     border-radius: 10px 10px 0 0;
@@ -388,7 +388,7 @@
 }
 
 .view-all-link {
-    color: #3a7bd5;
+    color: #3a8eba;
     text-decoration: none;
     font-size: 0.875rem;
     font-weight: 500;
@@ -412,7 +412,7 @@
 }
 
 .message-box .message-header {
-    background: linear-gradient(135deg, #3a7bd5, #00d1b2);
+    background: linear-gradient(135deg, #3a8eba, #295785);
     color: white;
     padding: 15px 20px;
     display: flex;
@@ -467,7 +467,7 @@
 
 .message-box .form-control:focus {
     outline: none;
-    border-color: #3a7bd5;
+    border-color: #3a8eba;
 }
 
 .message-box .message-send {
@@ -475,7 +475,7 @@
     border-radius: 20px;
     height: auto;
     padding: 8px;
-    background: linear-gradient(135deg, #3a7bd5, #00d1b2);
+    background: linear-gradient(135deg, #3a8eba, #295785);
     color: white;
     border: none;
     display: flex;

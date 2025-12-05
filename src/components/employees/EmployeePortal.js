@@ -11,7 +11,8 @@ import {
 } from '../../services/api';
 import EmployeeNotes from '../common/EmployeeNotes';
 import ChangePasswordModal from './ChangePasswordModal';
-import VoiceAssistantButton from './VoiceAssistantButton';
+import EmployeeMessagingSimple from './EmployeeMessagingSimple';
+import EmployeePersonalStats from './EmployeePersonalStats';
 
 // Composant pour la modale de détails des sanctions
 const SanctionDetailsModal = ({ sanction, isOpen, onClose }) => {
@@ -77,11 +78,15 @@ const EmployeePortal = ({ onLogout }) => {
   const [requestType, setRequestType] = useState('');
   const [showRequestDetailsModal, setShowRequestDetailsModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   
   // États pour les données de l'application
   const [employeeRequests, setEmployeeRequests] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [documentSearchTerm, setDocumentSearchTerm] = useState('');
+  const [documentFilterType, setDocumentFilterType] = useState('all');
 
   // Fonction pour voir les détails d'une sanction
   const viewSanctionDetails = (sanction) => {
@@ -100,7 +105,7 @@ const EmployeePortal = ({ onLogout }) => {
         
         if (!userData) {
           console.log("Aucune donnée utilisateur trouvée, redirection vers la page de connexion");
-          navigate('/EmployeeLogin');
+          navigate('/login');
           return;
         }
         
@@ -130,7 +135,7 @@ const EmployeePortal = ({ onLogout }) => {
         }
       } catch (error) {
         console.error('Erreur lors de la vérification de l\'authentification:', error);
-        navigate('/EmployeeLogin');
+        navigate('/login');
       } finally {
         setLoading(false);
       }
@@ -146,6 +151,17 @@ const EmployeePortal = ({ onLogout }) => {
         try {
           console.log("Chargement des événements à venir");
           const upcomingEvents = await evenementService.getUpcoming();
+          
+          // Charger les messages non lus
+          try {
+            const response = await fetch(`/api/messages/employee/${user.id}`);
+            if (response.ok) {
+              const data = await response.json();
+              setUnreadMessages(data.unreadCount || 0);
+            }
+          } catch (error) {
+            console.error('Erreur lors du chargement des messages non lus:', error);
+          }
           console.log("Événements récupérés:", upcomingEvents);
           setEvents(upcomingEvents);
         } catch (eventError) {
@@ -185,6 +201,17 @@ const EmployeePortal = ({ onLogout }) => {
           console.error("Erreur lors du chargement des sanctions:", sanctionError);
           // En cas d'erreur, ne pas définir de données fictives pour les sanctions
           setSanctions([]);
+        }
+
+        // Charger le nombre de messages non lus
+        try {
+          const response = await fetch(`/api/messages/employee/${user.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setUnreadMessages(data.unreadCount || 0);
+          }
+        } catch (error) {
+          console.error('Erreur lors du chargement des messages non lus:', error);
         }
         
         try {
@@ -270,30 +297,43 @@ const EmployeePortal = ({ onLogout }) => {
         //   }
         // ]);
         
-        // Charger les documents (données fictives pour l'instant)
-        setDocuments([
-          {
-            id: 201,
-            name: 'Fiche de paie - Mai 2025',
-            type: 'payslip',
-            date: '2025-06-01',
-            size: '245 KB'
-          },
-          {
-            id: 202,
-            name: 'Attestation employeur',
-            type: 'certificate',
-            date: '2025-05-15',
-            size: '120 KB'
-          },
-          {
-            id: 203,
-            name: 'Contrat de travail',
-            type: 'contract',
-            date: '2024-01-10',
-            size: '350 KB'
+        // Charger les documents depuis l'API
+        try {
+          setLoadingDocuments(true);
+          console.log("Chargement des documents pour l'employé ID:", userId);
+          const response = await fetch(`http://localhost:5000/api/employees/${userId}/documents`, {
+            headers: {
+              'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.ok) {
+            const documentsData = await response.json();
+            console.log("Documents récupérés:", documentsData);
+            
+            // Transformer les données pour correspondre au format attendu
+            const formattedDocuments = documentsData.map(doc => ({
+              id: doc.id,
+              name: doc.file_name,
+              type: doc.document_type?.toLowerCase() || 'other',
+              date: doc.upload_date,
+              size: 'N/A', // La taille n'est pas stockée dans la base
+              file_path: doc.file_path,
+              file_type: doc.file_type
+            }));
+            
+            setDocuments(formattedDocuments);
+          } else {
+            console.warn("Impossible de charger les documents depuis l'API, utilisation de données par défaut");
+            // En cas d'erreur, utiliser des données par défaut
+            setDocuments([]);
           }
-        ]);
+        } catch (docError) {
+          console.error("Erreur lors du chargement des documents:", docError);
+          setDocuments([]);
+        } finally {
+          setLoadingDocuments(false);
+        }
         
         // Charger le planning (données fictives pour l'instant)
         // setSchedule([
@@ -363,8 +403,8 @@ const EmployeePortal = ({ onLogout }) => {
     sessionStorage.removeItem('employeeUser');
     sessionStorage.removeItem('token');
     
-    // Rediriger vers la page de connexion employé
-    navigate('/employee-login');
+    // Rediriger vers la page de connexion
+    navigate('/login');
   };
   
   // Obtenir la date d'aujourd'hui
@@ -389,56 +429,56 @@ const EmployeePortal = ({ onLogout }) => {
   };
 
   // Fonction pour soumettre une nouvelle demande
-  const submitNewRequest = async (formData) => {
+  const submitNewRequest = async (formData, { setSubmitting }) => {
     try {
-      // Appeler l'API pour créer une nouvelle demande
-      // En fonction du type de demande, vous appellerez différentes API
-      if (requestType === 'leave') {
-        const newRequest = await requestService.create({
-          employee_id: userId,
-          request_type: 'leave',
-          start_date: formData.startDate,
-          end_date: formData.endDate,
-          reason: formData.reason,
-          request_details: formData.details,
-          status: 'pending'
-        });
-        
-        // Ajouter la nouvelle demande à la liste
-        setEmployeeRequests(prev => [newRequest, ...prev]);
-      } else if (requestType === 'document') {
-        const newRequest = await requestService.create({
-          employee_id: userId,
-          request_type: 'document',
-          request_details: formData.details,
-          reason: formData.reason,
-          status: 'pending'
-        });
-        
-        // Ajouter la nouvelle demande à la liste
-        setEmployeeRequests(prev => [newRequest, ...prev]);
-      } else {
-        // Autre type de demande
-        const newRequest = await requestService.create({
-          employee_id: userId,
-          request_type: 'other',
-          request_details: formData.details,
-          reason: formData.reason,
-          status: 'pending'
-        });
-        
-        // Ajouter la nouvelle demande à la liste
-        setEmployeeRequests(prev => [newRequest, ...prev]);
+      setSubmitting(true);
+      setError(null);
+      
+      if (!userId) {
+        throw new Error('ID utilisateur non disponible');
       }
+      
+      // Préparer les données de la demande
+      let requestData = {
+        employee_id: userId,
+        request_type: requestType,
+        reason: formData.reason,
+        request_details: formData.details || '',
+        status: 'pending'
+      };
+      
+      // Ajouter les dates pour les demandes de congé
+      if (requestType === 'leave') {
+        if (!formData.startDate || !formData.endDate) {
+          throw new Error('Les dates de début et de fin sont requises pour une demande de congé');
+        }
+        requestData.start_date = formData.startDate;
+        requestData.end_date = formData.endDate;
+      }
+      
+      // Appeler l'API pour créer une nouvelle demande
+      const newRequest = await requestService.create(requestData);
+      
+      // Ajouter la nouvelle demande à la liste
+      setEmployeeRequests(prev => [newRequest, ...prev]);
+      
+      // Émettre un événement pour la mise à jour en temps réel
+      window.dispatchEvent(new CustomEvent('newRequest', {
+        detail: { requestId: newRequest.id, type: requestType }
+      }));
       
       // Afficher un message de succès
       setSuccessMessage('Votre demande a été soumise avec succès.');
       
-      // Fermer la modale
-      closeNewRequestModal();
+      // Fermer la modale après un court délai
+      setTimeout(() => {
+        closeNewRequestModal();
+        setSubmitting(false);
+      }, 500);
     } catch (error) {
       console.error('Erreur lors de la création de la demande:', error);
-      setError('Une erreur est survenue lors de la création de la demande. Veuillez réessayer.');
+      setError(error.message || 'Une erreur est survenue lors de la création de la demande. Veuillez réessayer.');
+      setSubmitting(false);
     }
   };
 
@@ -449,6 +489,8 @@ const EmployeePortal = ({ onLogout }) => {
     }
     
     try {
+      setError(null);
+      
       // Appeler l'API pour annuler la demande
       await requestService.delete(requestId);
       
@@ -457,9 +499,14 @@ const EmployeePortal = ({ onLogout }) => {
       
       // Afficher un message de succès
       setSuccessMessage('Votre demande a été annulée avec succès.');
+      
+      // Émettre un événement pour la mise à jour en temps réel
+      window.dispatchEvent(new CustomEvent('requestCancelled', {
+        detail: { requestId }
+      }));
     } catch (error) {
       console.error('Erreur lors de l\'annulation de la demande:', error);
-      setError('Une erreur est survenue lors de l\'annulation de la demande. Veuillez réessayer.');
+      setError(error.message || 'Une erreur est survenue lors de l\'annulation de la demande. Veuillez réessayer.');
     }
   };
 
@@ -470,18 +517,59 @@ const EmployeePortal = ({ onLogout }) => {
   };
 
   // Fonction pour voir un document
-  const viewDocument = (document) => {
-    // setSelectedDocument(document); // This line was removed as per the edit hint
-    // setShowDocumentViewModal(true); // This line was removed as per the edit hint
+  const viewDocument = (doc) => {
+    try {
+      setError(null);
+      
+      if (!doc.id) {
+        throw new Error('Document non disponible');
+      }
+      
+      // Construire l'URL avec le token d'authentification
+      const token = sessionStorage.getItem('token');
+      const url = `http://localhost:5000/api/employees/documents/${doc.id}/view?token=${token}`;
+      window.open(url, '_blank');
+    } catch (error) {
+      console.error('Erreur lors de l\'ouverture du document:', error);
+      setError(error.message || 'Impossible d\'ouvrir le document. Veuillez réessayer.');
+    }
   };
 
   // Fonction pour télécharger un document
-  const downloadDocument = (document) => {
-    // Simuler un téléchargement
-    alert(`Téléchargement du document "${document.name}" en cours...`);
-    
-    // En production, vous utiliseriez une API réelle pour télécharger le document
-    // window.open(`${API_URL}/documents/download/${document.id}`, '_blank');
+  const downloadDocument = async (doc) => {
+    try {
+      setError(null);
+      
+      if (!doc.id) {
+        throw new Error('Document non disponible');
+      }
+      
+      const response = await fetch(`http://localhost:5000/api/employees/documents/${doc.id}/download`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = doc.name || 'document.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        setSuccessMessage(`Téléchargement de "${doc.name}" démarré.`);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Impossible de télécharger le document');
+      }
+    } catch (error) {
+      console.error('Erreur lors du téléchargement:', error);
+      setError(error.message || 'Impossible de télécharger le document. Veuillez réessayer.');
+    }
   };
   
   // Fonction pour formater une date
@@ -499,17 +587,41 @@ const EmployeePortal = ({ onLogout }) => {
   
   // Obtenir l'icône pour un type de document
   const getDocumentIcon = (type) => {
-    switch (type) {
+    const typeLower = type?.toLowerCase() || '';
+    switch (typeLower) {
       case 'payslip':
+      case 'fiche de paie':
+      case 'bulletin de salaire':
         return 'fa-file-invoice-dollar';
       case 'certificate':
+      case 'attestation':
+      case 'certificat':
         return 'fa-certificate';
       case 'contract':
+      case 'contrat':
         return 'fa-file-signature';
+      case 'pdf':
+        return 'fa-file-pdf';
+      case 'word':
+        return 'fa-file-word';
+      case 'excel':
+        return 'fa-file-excel';
+      case 'image':
+        return 'fa-file-image';
       default:
         return 'fa-file-alt';
     }
   };
+
+
+  // Filtrer les documents
+  const filteredDocuments = documents.filter(doc => {
+    const matchesSearch = !documentSearchTerm || 
+      doc.name.toLowerCase().includes(documentSearchTerm.toLowerCase());
+    const matchesType = documentFilterType === 'all' || 
+      doc.type === documentFilterType;
+    return matchesSearch && matchesType;
+  });
   
   // Obtenir l'icône et la classe pour un type de demande
   const getRequestInfo = (type, status) => {
@@ -573,7 +685,7 @@ const EmployeePortal = ({ onLogout }) => {
         </div>
         <button 
           className="btn btn-primary mt-3" 
-          onClick={() => navigate('/EmployeeLogin')}
+          onClick={() => navigate('/login')}
         >
           Retour à la page de connexion
         </button>
@@ -596,7 +708,20 @@ const EmployeePortal = ({ onLogout }) => {
         
         <div className="sidebar-user">
           <div className="user-avatar">
-            {user?.nom_prenom?.charAt(0) || 'U'}
+            {user?.photo_path ? (
+              <img 
+                src={`http://localhost:5000${user.photo_path}`} 
+                alt={user?.nom_prenom || 'Utilisateur'}
+                className="user-photo"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div className="user-avatar-fallback" style={{ display: user?.photo_path ? 'none' : 'flex' }}>
+              {user?.nom_prenom?.charAt(0) || 'U'}
+            </div>
           </div>
           <div className="user-info">
             <h4>{user?.nom_prenom || 'Utilisateur'}</h4>
@@ -654,6 +779,16 @@ const EmployeePortal = ({ onLogout }) => {
               </button>
             </li>
             
+            <li className={activeTab === 'messages' ? 'active' : ''}>
+              <button onClick={() => setActiveTab('messages')}>
+                <i className="fas fa-comments"></i>
+                <span>Messages</span>
+                {unreadMessages > 0 && (
+                  <span className="message-badge">{unreadMessages}</span>
+                )}
+              </button>
+            </li>
+            
             <li className={activeTab === 'profile' ? 'active' : ''}>
               <button onClick={() => setActiveTab('profile')}>
                 <i className="fas fa-user"></i>
@@ -680,8 +815,9 @@ const EmployeePortal = ({ onLogout }) => {
               {activeTab === 'documents' && 'Mes documents'}
               {activeTab === 'requests' && 'Mes demandes'}
               {activeTab === 'notes' && 'Notes de service'}
-              {activeTab === 'evenements' && 'Evenements'}
+              {activeTab === 'events' && 'Événements'}
               {activeTab === 'sanctions' && 'Mes sanctions'}
+              {activeTab === 'messages' && 'Messages RH'}
               {activeTab === 'profile' && 'Mon profil'}
             </h2>
             <p className="date-display">{formattedDate}</p>
@@ -742,6 +878,17 @@ const EmployeePortal = ({ onLogout }) => {
                   />
                 </div>
               </div>
+              
+              {/* Statistiques personnelles */}
+              <EmployeePersonalStats 
+                user={user}
+                employeeRequests={employeeRequests}
+                events={events}
+                notes={notes}
+                sanctions={sanctions}
+                unreadMessages={unreadMessages}
+                onTabChange={setActiveTab}
+              />
               
               <div className="dashboard-grid">
                 <div className="dashboard-card">
@@ -886,49 +1033,124 @@ const EmployeePortal = ({ onLogout }) => {
           {activeTab === 'documents' && (
             <div className="documents-tab">
               <div className="documents-header">
-                <h3>Mes documents</h3>
+                <div>
+                  <h3>Mes documents</h3>
+                  <p className="documents-subtitle">Consultez et téléchargez vos documents personnels</p>
+                </div>
                 <div className="documents-actions">
                   <div className="search-container">
                     <i className="fas fa-search search-icon"></i>
-                    <input type="text" placeholder="Rechercher un document..." className="search-input" />
+                    <input 
+                      type="text" 
+                      placeholder="Rechercher un document..." 
+                      className="search-input"
+                      value={documentSearchTerm}
+                      onChange={(e) => setDocumentSearchTerm(e.target.value)}
+                    />
                   </div>
-                  <select className="form-select">
+                  <select 
+                    className="form-select"
+                    value={documentFilterType}
+                    onChange={(e) => setDocumentFilterType(e.target.value)}
+                  >
                     <option value="all">Tous les types</option>
                     <option value="payslip">Fiches de paie</option>
                     <option value="certificate">Attestations</option>
                     <option value="contract">Contrats</option>
+                    <option value="identité">Pièces d'identité</option>
+                    <option value="administratif">Documents administratifs</option>
+                    <option value="other">Autres</option>
                   </select>
                 </div>
               </div>
               
-              <div className="documents-list">
-                {documents.map(doc => (
-                  <div className="document-card" key={doc.id}>
-                    <div className="document-icon">
-                      <i className={`fas ${getDocumentIcon(doc.type)}`}></i>
-                    </div>
-                    <div className="document-info">
-                      <h5>{doc.name}</h5>
-                      <div className="document-meta">
-                        <span><i className="fas fa-calendar-alt"></i> {formatDate(doc.date)}</span>
-                        <span><i className="fas fa-file-alt"></i> {doc.size}</span>
-                      </div>
-                    </div>
-                    <div className="document-actions">
-                      <button className="btn-icon" title="Télécharger" onClick={() => downloadDocument(doc)}>
-                        <i className="fas fa-download"></i>
-                      </button>
-                      <button className="btn-icon" title="Voir" onClick={() => viewDocument(doc)}>
-                        <i className="fas fa-eye"></i>
-                      </button>
-                    </div>
+              {loadingDocuments ? (
+                <div className="text-center p-5">
+                  <div className="spinner-border text-primary" role="status">
+                    <span className="visually-hidden">Chargement...</span>
                   </div>
-                ))}
-              </div>
+                  <p className="mt-3">Chargement de vos documents...</p>
+                </div>
+              ) : filteredDocuments.length === 0 ? (
+                <div className="empty-state-card">
+                  <i className="far fa-folder-open fa-4x mb-3" style={{ color: '#bdc3c7' }}></i>
+                  <h4>
+                    {documents.length === 0 
+                      ? 'Aucun document disponible' 
+                      : 'Aucun document ne correspond à votre recherche'}
+                  </h4>
+                  <p>
+                    {documents.length === 0 
+                      ? 'Vous n\'avez pas encore de documents dans votre espace. Les documents seront ajoutés ici par le service RH.'
+                      : 'Essayez de modifier vos critères de recherche ou de filtre.'}
+                  </p>
+                  {documents.length === 0 && (
+                    <button className="btn-primary mt-3" onClick={() => handleNewRequest('document')}>
+                      <i className="fas fa-plus"></i> Demander un document
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="documents-stats mb-3">
+                    <span className="documents-count">
+                      {filteredDocuments.length} document{filteredDocuments.length > 1 ? 's' : ''} 
+                      {documentSearchTerm || documentFilterType !== 'all' ? ' trouvé(s)' : ' disponible(s)'}
+                    </span>
+                  </div>
+                  
+                  <div className="documents-list">
+                    {filteredDocuments.map(doc => (
+                      <div className="document-card" key={doc.id}>
+                        <div className="document-icon">
+                          <i className={`fas ${getDocumentIcon(doc.type || doc.file_type)}`}></i>
+                        </div>
+                        <div className="document-info">
+                          <h5>{doc.name}</h5>
+                          <div className="document-meta">
+                            <span>
+                              <i className="fas fa-tag"></i> {doc.type || 'Autre'}
+                            </span>
+                            <span>
+                              <i className="fas fa-calendar-alt"></i> {formatDate(doc.date)}
+                            </span>
+                            {doc.size && doc.size !== 'N/A' && (
+                              <span>
+                                <i className="fas fa-file-alt"></i> {doc.size}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="document-actions">
+                          <button 
+                            className="btn-icon" 
+                            title="Télécharger" 
+                            onClick={() => downloadDocument(doc)}
+                          >
+                            <i className="fas fa-download"></i>
+                          </button>
+                          <button 
+                            className="btn-icon" 
+                            title="Voir" 
+                            onClick={() => viewDocument(doc)}
+                          >
+                            <i className="fas fa-eye"></i>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
               
               <div className="document-request">
-                <h4>Demander un document</h4>
-                <p>Vous ne trouvez pas le document que vous cherchez ? Faites une demande auprès du service RH.</p>
+                <div className="document-request-icon">
+                  <i className="fas fa-file-plus"></i>
+                </div>
+                <div className="document-request-content">
+                  <h4>Demander un document</h4>
+                  <p>Vous ne trouvez pas le document que vous cherchez ? Faites une demande auprès du service RH.</p>
+                </div>
                 <button className="btn-primary" onClick={() => handleNewRequest('document')}>
                   <i className="fas fa-plus"></i> Nouvelle demande
                 </button>
@@ -1105,64 +1327,109 @@ const EmployeePortal = ({ onLogout }) => {
             </div>
           )}
 
-{activeTab === 'events' && (
-  <div className="events-tab">
-    <div className="events-header">
-      <h3>Calendrier des événements</h3>
-    </div>
-    
-    <div className="events-container">
-      {loading ? ( // Changed from isLoading to loading
-        <div className="text-center p-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Chargement...</span>
-          </div>
-        </div>
-      ) : events.length === 0 ? (
-        <div className="alert alert-info text-center">
-          <i className="fas fa-info-circle me-2"></i>
-          Aucun événement prévu prochainement.
-        </div>
-      ) : (
-        <div className="events-list-full">
-          {events.map((event) => (
-            <div className="event-card" key={event.id}>
-              <div className="event-date-badge">
-                <div className="date-day">
-                  {new Date(event.date).getDate()}
-                </div>
-                <div className="date-month">
-                  {new Date(event.date).toLocaleDateString('fr-FR', { month: 'short' })}
-                </div>
+          {/* Events Tab */}
+          {activeTab === 'events' && (
+            <div className="events-tab">
+              <div className="events-header">
+                <h3>Calendrier des événements</h3>
+                <p className="events-subtitle">Consultez les événements et activités à venir</p>
               </div>
-              <div className="event-content">
-                <h4 className="event-title">{event.name}</h4>
-                <div className="event-details">
-                  <p className="event-location">
-                    <i className="fas fa-map-marker-alt"></i> {event.location}
-                  </p>
-                  <p className="event-time">
-                    <i className="fas fa-clock"></i> Toute la journée
-                  </p>
-                </div>
-                <p className="event-description">
-                  {event.description}
-                </p>
+              
+              <div className="events-container">
+                {loading ? (
+                  <div className="text-center p-5">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">Chargement...</span>
+                    </div>
+                  </div>
+                ) : events.length === 0 ? (
+                  <div className="empty-state-card">
+                    <i className="far fa-calendar-times fa-4x mb-3" style={{ color: '#bdc3c7' }}></i>
+                    <h4>Aucun événement prévu</h4>
+                    <p>Aucun événement n'est prévu prochainement. Les nouveaux événements apparaîtront ici.</p>
+                  </div>
+                ) : (
+                  <div className="events-list-full">
+                    {events.map((event, index) => {
+                      // Gérer les dates qui peuvent être déjà formatées ou être des objets Date
+                      let eventDate;
+                      try {
+                        if (event.date) {
+                          eventDate = new Date(event.date);
+                        } else if (event.formatted_date) {
+                          // Si la date est déjà formatée, essayer de la parser
+                          const parts = event.formatted_date.split('/');
+                          if (parts.length === 3) {
+                            eventDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                          } else {
+                            eventDate = new Date();
+                          }
+                        } else {
+                          eventDate = new Date();
+                        }
+                      } catch (e) {
+                        eventDate = new Date();
+                      }
+                      
+                      return (
+                        <div className="event-card" key={event.id || index}>
+                          <div className="event-date-badge">
+                            <div className="date-day">
+                              {eventDate.getDate()}
+                            </div>
+                            <div className="date-month">
+                              {eventDate.toLocaleDateString('fr-FR', { month: 'short' })}
+                            </div>
+                          </div>
+                          <div className="event-content">
+                            <h4 className="event-title">{event.name}</h4>
+                            <div className="event-details">
+                              <p className="event-location">
+                                <i className="fas fa-map-marker-alt"></i> {event.location || 'Lieu non spécifié'}
+                              </p>
+                              <p className="event-time">
+                                <i className="fas fa-clock"></i> {event.formatted_date || eventDate.toLocaleDateString('fr-FR')}
+                              </p>
+                            </div>
+                            <p className="event-description">
+                              {event.description || 'Aucune description disponible.'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  </div>
-)}
+          )}
+
+          {/* Messages Tab */}
+        {activeTab === 'messages' && (
+          <div className="messages-tab">
+            <EmployeeMessagingSimple user={user} />
+          </div>
+        )}
 
           {/* Profile Tab */}
           {activeTab === 'profile' && (
             <div className="profile-tab">
               <div className="profile-header">
                 <div className="profile-avatar">
-                  {user?.nom_prenom?.charAt(0) || 'U'}
+                  {user?.photo_path ? (
+                    <img 
+                      src={`http://localhost:5000${user.photo_path}`} 
+                      alt={user?.nom_prenom || 'Utilisateur'}
+                      className="profile-photo"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div className="profile-avatar-fallback" style={{ display: user?.photo_path ? 'none' : 'flex' }}>
+                    {user?.nom_prenom?.charAt(0) || 'U'}
+                  </div>
                 </div>
                 <div className="profile-header-info">
                   <h3>{user?.nom_prenom || 'Utilisateur'}</h3>
@@ -1293,9 +1560,9 @@ const EmployeePortal = ({ onLogout }) => {
                       }
                       return errors;
                     }}
-                    onSubmit={submitNewRequest}
+                    onSubmit={(values, actions) => submitNewRequest(values, actions)}
                   >
-                    {({ isSubmitting, errors, touched }) => (
+                    {({ isSubmitting, errors, touched, setSubmitting }) => (
                       <Form>
                         {requestType === 'leave' && (
                           <>
@@ -1305,6 +1572,7 @@ const EmployeePortal = ({ onLogout }) => {
                                 name="startDate"
                                 type="date"
                                 className={`form-control ${errors.startDate && touched.startDate ? 'is-invalid' : ''}`}
+                                min={new Date().toISOString().split('T')[0]}
                               />
                               <ErrorMessage name="startDate" component="div" className="invalid-feedback" />
                             </div>
@@ -1314,6 +1582,7 @@ const EmployeePortal = ({ onLogout }) => {
                                 name="endDate"
                                 type="date"
                                 className={`form-control ${errors.endDate && touched.endDate ? 'is-invalid' : ''}`}
+                                min={new Date().toISOString().split('T')[0]}
                               />
                               <ErrorMessage name="endDate" component="div" className="invalid-feedback" />
                             </div>
@@ -1373,6 +1642,7 @@ const EmployeePortal = ({ onLogout }) => {
                             type="button" 
                             className="btn btn-secondary me-2" 
                             onClick={closeNewRequestModal}
+                            disabled={isSubmitting}
                           >
                             Annuler
                           </button>
@@ -1521,13 +1791,11 @@ const EmployeePortal = ({ onLogout }) => {
               setTimeout(() => {
                 sessionStorage.removeItem('employeeUser');
                 sessionStorage.removeItem('token');
-                navigate('/EmployeeLogin');
+                navigate('/login');
               }, 3000);
             }}
           />
 
-          {/* Bouton flottant de l'assistant vocal */}
-          <VoiceAssistantButton user={user} />
         </main>
       </div>
     </div>

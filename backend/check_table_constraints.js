@@ -110,3 +110,11 @@ async function checkTableConstraints() {
 }
 
 checkTableConstraints().catch(console.error);
+
+
+
+
+
+
+
+

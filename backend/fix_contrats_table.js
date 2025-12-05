@@ -70,3 +70,11 @@ async function fixContratsTable() {
 }
 
 fixContratsTable().catch(console.error);
+
+
+
+
+
+
+
+

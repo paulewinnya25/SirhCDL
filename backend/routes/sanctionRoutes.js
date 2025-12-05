@@ -95,28 +95,39 @@ module.exports = (pool) => {
                 statut
             } = req.body;
 
-            const query = `
+            // Récupérer la sanction actuelle pour préserver les valeurs non fournies
+            const currentQuery = 'SELECT * FROM sanctions_table WHERE id = $1';
+            const currentResult = await pool.query(currentQuery, [id]);
+            
+            if (currentResult.rows.length === 0) {
+                return res.status(404).json({ error: 'Sanction not found' });
+            }
+            
+            const current = currentResult.rows[0];
+
+            // Utiliser les nouvelles valeurs si fournies, sinon garder les valeurs actuelles
+            const updateQuery = `
                 UPDATE sanctions_table 
-                SET nom_employe = $1, 
-                    type_sanction = $2, 
-                    contenu_sanction = $3, 
-                    date = $4,
-                    statut = $5,
+                SET nom_employe = COALESCE($1, nom_employe), 
+                    type_sanction = COALESCE($2, type_sanction), 
+                    contenu_sanction = COALESCE($3, contenu_sanction), 
+                    date = COALESCE($4, date),
+                    statut = COALESCE($5, statut),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = $6 
                 RETURNING *
             `;
 
             const values = [
-                nom_employe, 
-                type_sanction, 
-                contenu_sanction, 
-                date,
-                statut,
+                nom_employe || current.nom_employe, 
+                type_sanction || current.type_sanction, 
+                contenu_sanction || current.contenu_sanction, 
+                date || current.date,
+                statut || current.statut,
                 id
             ];
 
-            const result = await pool.query(query, values);
+            const result = await pool.query(updateQuery, values);
 
             if (result.rows.length === 0) {
                 return res.status(404).json({ error: 'Sanction not found' });
@@ -256,3 +267,9 @@ router.put('/:id/cancel', async (req, res) => {
 
     return router;
 };
+
+
+
+
+
+

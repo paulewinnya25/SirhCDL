@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { evenementService, noteService } from '../../services/api';
+import { usePendingRequestsCount } from '../../hooks/usePendingRequestsCount';
 import EventsComponent from '../common/EventsComponent';
 import '../../styles/Dashboard.css';
 
 const Dashboard = () => {
   const [notes, setNotes] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [events, setEvents] = useState([]);
   const [loadingNotes, setLoadingNotes] = useState(true);
   const [notesError, setNotesError] = useState(null);
+  const { pendingCount } = usePendingRequestsCount();
 
   useEffect(() => {
     // Fetch data
     const fetchData = async () => {
-      setIsLoading(true);
       try {
         // Récupérer les événements depuis l'API
         const eventsData = await evenementService.getUpcoming();
@@ -56,8 +56,6 @@ const Dashboard = () => {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-      } finally {
-        setIsLoading(false);
       }
     };
 
@@ -105,11 +103,6 @@ const Dashboard = () => {
       path: '/contrats'
     },
     {
-      title: 'Gestion des performances',
-      icon: 'fas fa-chart-line',
-      path: '/performance-management'
-    },
-    {
       title: 'Gestion des sanctions',
       icon: 'fas fa-gavel',
       path: '/sanctions'
@@ -117,7 +110,8 @@ const Dashboard = () => {
     {
       title: 'Demandes employés',
       icon: 'fas fa-file-alt',
-      path: '/employee-requests'
+      path: '/employee-requests',
+      notificationCount: pendingCount
     }
     
   ];
@@ -203,11 +197,16 @@ const Dashboard = () => {
   };
 
   // Tool Card Component (inline)
-  const ToolCard = ({ title, icon, path }) => {
+  const ToolCard = ({ title, icon, path, notificationCount }) => {
     return (
       <Link to={path} className="tool-card">
         <div className="tool-icon">
           <i className={icon}></i>
+          {notificationCount > 0 && (
+            <span className="tool-notification-badge">
+              {notificationCount > 99 ? '99+' : notificationCount}
+            </span>
+          )}
         </div>
         <h3 className="tool-title">{title}</h3>
       </Link>
@@ -274,9 +273,7 @@ const Dashboard = () => {
           <h1 className="page-title">Bienvenue sur votre portail RH</h1>
           <p className="page-subtitle">Gérez efficacement toutes les ressources humaines de votre entreprise.</p>
         </div>
-        <button className="nav-action-btn voice-assistant-btn" id="voiceAssistantBtn" title="Assistant vocal">
-          <i className="fas fa-microphone"></i>
-        </button>
+       
       </div>
       
       <div className="stats-row">
@@ -307,6 +304,7 @@ const Dashboard = () => {
               title={tool.title}
               icon={tool.icon}
               path={tool.path}
+              notificationCount={tool.notificationCount}
             />
           ))}
         </div>

@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import api from '../services/api';
+import { authService } from '../services/api';
 
 // Create auth context
 const AuthContext = createContext();
@@ -35,14 +35,23 @@ export const AuthProvider = ({ children }) => {
     setError(null);
     
     try {
-      const response = await api.login({ email, password });
-      const userData = response.data;
+      const result = await authService.login(email, password);
       
-      // Store user data in state and session storage
-      setUser(userData);
-      sessionStorage.setItem('user', JSON.stringify(userData));
-      
-      return { success: true, user: userData };
+      if (result.success) {
+        // S'assurer que l'utilisateur a un ID
+        const userData = result.user;
+        if (!userData.id) {
+          userData.id = userData.email || email;
+        }
+        
+        // Store user data in state and session storage
+        setUser(userData);
+        sessionStorage.setItem('user', JSON.stringify(userData));
+        return { success: true, user: userData };
+      } else {
+        setError(result.error);
+        return { success: false, error: result.error };
+      }
     } catch (err) {
       console.error('Login error:', err);
       setError(err.message || 'Erreur de connexion');
@@ -52,10 +61,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Set user directly (for unified login)
+  const setUserDirectly = (userData) => {
+    // S'assurer que l'utilisateur a un ID
+    if (userData && !userData.id) {
+      userData.id = userData.email || userData.id;
+    }
+    setUser(userData);
+    if (userData) {
+      sessionStorage.setItem('user', JSON.stringify(userData));
+    } else {
+      sessionStorage.removeItem('user');
+    }
+  };
+
   // Logout function
-  const logout = () => {
-    setUser(null);
-    sessionStorage.removeItem('user');
+  const logout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setUser(null);
+      sessionStorage.removeItem('user');
+    }
   };
 
   // Auth context value
@@ -65,6 +94,7 @@ export const AuthProvider = ({ children }) => {
     error,
     login,
     logout,
+    setUserDirectly,
     isAuthenticated: !!user
   };
 

@@ -35,19 +35,6 @@ const Layout = ({ user, onLogout }) => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  // Mock functions for TopNav (these will be handled internally now)
-  const toggleMessageBox = () => {
-    console.log('Layout - Message box toggle (handled by TopNav)');
-  };
-
-  const toggleUserDropdown = () => {
-    console.log('Layout - User dropdown toggle (handled by TopNav)');
-  };
-
-  const toggleNotificationsDropdown = () => {
-    console.log('Layout - Notifications dropdown toggle (handled by TopNav)');
-  };
-
   return (
     <div className="layout-container">
       <Sidebar 
@@ -58,10 +45,8 @@ const Layout = ({ user, onLogout }) => {
       <main className={`main-content ${sidebarCollapsed ? 'expanded' : ''}`}>
         <TopNav 
           toggleSidebar={toggleSidebar}
-          toggleMessageBox={toggleMessageBox}
-          toggleUserDropdown={toggleUserDropdown}
-          toggleNotificationsDropdown={toggleNotificationsDropdown}
           user={user}
+          onLogout={onLogout}
         />
         
         <div className="page-content">

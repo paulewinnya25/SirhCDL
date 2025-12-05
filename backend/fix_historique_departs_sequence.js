@@ -100,3 +100,11 @@ async function fixHistoriqueDepartsSequence() {
 }
 
 fixHistoriqueDepartsSequence().catch(console.error);
+
+
+
+
+
+
+
+

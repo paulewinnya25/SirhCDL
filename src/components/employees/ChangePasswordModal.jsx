@@ -59,13 +59,17 @@ const ChangePasswordModal = ({ isOpen, onClose, onSuccess, user }) => {
       
       // Gestion des erreurs spécifiques
       if (error.response?.status === 400) {
-        setError('Le mot de passe actuel est incorrect.');
+        const message = error.response?.data?.message || 'Le mot de passe actuel est incorrect ou le nouveau mot de passe ne respecte pas les critères.';
+        setError(message);
       } else if (error.response?.status === 401) {
-        setError('Votre session a expiré. Veuillez vous reconnecter.');
+        setError(error.response?.data?.message || 'L\'ancien mot de passe est incorrect.');
+      } else if (error.response?.status === 404) {
+        setError(error.response?.data?.message || 'Employé non trouvé.');
       } else if (error.response?.status === 422) {
         setError('Le nouveau mot de passe ne respecte pas les critères de sécurité.');
       } else {
-        setError('Une erreur est survenue lors du changement de mot de passe. Veuillez réessayer.');
+        const message = error.response?.data?.message || error.message || 'Une erreur est survenue lors du changement de mot de passe. Veuillez réessayer.';
+        setError(message);
       }
     } finally {
       setIsSubmitting(false);

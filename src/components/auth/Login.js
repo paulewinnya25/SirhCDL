@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import '../../styles/Login.css';
 
-const Login = ({ onLogin }) => {
+const Login = () => {
   const [credentials, setCredentials] = useState({
     email: '',
     password: ''
@@ -11,6 +12,7 @@ const Login = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -33,7 +35,7 @@ const Login = ({ onLogin }) => {
     
     try {
       // Simulation d'un appel API pour l'authentification
-      setTimeout(() => {
+      setTimeout(async () => {
         // Identifiants de test (à remplacer par votre logique d'API)
         const validCredentials = {
           'rh@centre-diagnostic.com': 'Rh@2025CDL',
@@ -45,13 +47,19 @@ const Login = ({ onLogin }) => {
           const userData = {
             email: credentials.email,
             name: 'Admin RH',
-            role: 'admin'
+            role: 'admin',
+            nom: 'Admin',
+            prenom: 'RH',
+            poste: 'Administration',
+            fonction: 'Administrateur RH'
           };
           
-          // Connexion réussie
-          if (onLogin && typeof onLogin === 'function') {
-            onLogin(userData);
+          // Utiliser le contexte d'authentification
+          const result = await login(credentials.email, credentials.password);
+          if (result.success) {
             navigate('/dashboard');
+          } else {
+            setError(result.error || 'Erreur de connexion');
           }
         } else {
           setError('Identifiants incorrects. Veuillez réessayer.');
@@ -98,8 +106,7 @@ const Login = ({ onLogin }) => {
                   placeholder="Votre adresse email" 
                   value={credentials.email}
                   onChange={handleInputChange}
-                  disabled={isLoading}
-                  required 
+                  required
                 />
               </div>
             </div>
@@ -116,35 +123,31 @@ const Login = ({ onLogin }) => {
                   placeholder="Votre mot de passe" 
                   value={credentials.password}
                   onChange={handleInputChange}
-                  disabled={isLoading}
-                  required 
+                  required
                 />
               </div>
             </div>
             
-            <div className="d-grid">
-              <button 
-                type="submit" 
-                className="btn btn-primary btn-lg" 
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    Connexion en cours...
-                  </>
-                ) : (
-                  <>
-                    <i className="fas fa-sign-in-alt me-2"></i>Se connecter
-                  </>
-                )}
-              </button>
-            </div>
+            <button 
+              type="submit" 
+              className="btn btn-primary w-100" 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  Connexion en cours...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-sign-in-alt me-2"></i>
+                  Se connecter
+                </>
+              )}
+            </button>
           </form>
           
-          <div className="login-footer mt-4">
-            <p className="text-center mb-0">&copy; {new Date().getFullYear()} Centre Diagnostic. Tous droits réservés.</p>
-          </div>
+         
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@
 export const CHARTS_CONFIG = {
   // Configuration de l'API
   API: {
-    BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:5001/api',
+    BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
     ENDPOINTS: {
       EMPLOYEES: '/employees',
       CONTRACTS: '/employees/alerts/expiring-contracts',
@@ -126,3 +126,7 @@ export const getStatusLabel = (status) => {
   };
   return labels[status] || 'Inconnu';
 };
+
+
+
+

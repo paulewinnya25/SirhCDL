@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // API base URL
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // Création d'une instance axios avec l'URL de base
 const api = axios.create({
@@ -60,7 +60,14 @@ export const congeService = {
   // Créer un nouveau congé
   create: async (congeData) => {
     try {
-      const response = await api.post('/conges', congeData);
+      // Si c'est FormData, ne pas définir Content-Type (laissé au navigateur)
+      const config = congeData instanceof FormData ? {} : {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      const response = await api.post('/conges', congeData, config);
       return response.data;
     } catch (error) {
       console.error('Error creating conge:', error);
@@ -71,7 +78,14 @@ export const congeService = {
   // Mettre à jour un congé
   update: async (id, congeData) => {
     try {
-      const response = await api.put(`/conges/${id}`, congeData);
+      // Si c'est FormData, ne pas définir Content-Type (laissé au navigateur)
+      const config = congeData instanceof FormData ? {} : {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      const response = await api.put(`/conges/${id}`, congeData, config);
       return response.data;
     } catch (error) {
       console.error(`Error updating conge ${id}:`, error);

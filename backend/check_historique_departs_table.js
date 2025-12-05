@@ -84,3 +84,11 @@ async function checkHistoriqueDepartsTable() {
 }
 
 checkHistoriqueDepartsTable().catch(console.error);
+
+
+
+
+
+
+
+

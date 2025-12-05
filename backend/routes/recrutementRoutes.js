@@ -64,14 +64,24 @@ module.exports = (pool) => {
   // Récupérer tous les recrutements
   router.get('/', async (req, res) => {
     try {
-      const query = `
+      // Récupérer les données de l'ancienne table historique_recrutement
+      const queryOld = `
         SELECT * FROM historique_recrutement
         ORDER BY date_recrutement DESC
       `;
-      const result = await pool.query(query);
+      const resultOld = await pool.query(queryOld);
       
-      // Transformer les données pour le frontend
-      const formattedResults = result.rows.map(row => ({
+      // Récupérer les données de la nouvelle table recrutement_history
+      const queryNew = `
+        SELECT rh.*, e.nom_prenom, e.matricule, e.poste_actuel, e.departement
+        FROM recrutement_history rh
+        LEFT JOIN employees e ON rh.employee_id = e.id
+        ORDER BY rh.date_recrutement DESC
+      `;
+      const resultNew = await pool.query(queryNew);
+      
+      // Transformer les données de l'ancienne table
+      const formattedOldResults = resultOld.rows.map(row => ({
         id: row.id,
         fullName: combineFullName(row.nom, row.prenom),
         position: row.poste,
@@ -82,10 +92,32 @@ module.exports = (pool) => {
         hiringDate: row.date_recrutement,
         notes: row.notes,
         recruiter: row.superieur_hierarchique,
-        cv_path: row.cv_path
+        cv_path: row.cv_path,
+        type: 'old'
       }));
       
-      res.json(formattedResults);
+      // Transformer les données de la nouvelle table
+      const formattedNewResults = resultNew.rows.map(row => ({
+        id: `new_${row.id}`,
+        fullName: row.nom_prenom || 'Employé supprimé',
+        position: row.poste_recrute || row.poste_actuel || 'Poste inconnu',
+        department: row.departement || 'Département inconnu',
+        source: row.source_recrutement,
+        status: row.type_contrat,
+        applicationDate: row.date_recrutement,
+        hiringDate: row.date_recrutement,
+        notes: row.notes,
+        recruiter: 'Onboarding',
+        cv_path: null,
+        matricule: row.matricule || 'N/A',
+        type: 'new'
+      }));
+      
+      // Combiner et trier les résultats
+      const allResults = [...formattedOldResults, ...formattedNewResults]
+        .sort((a, b) => new Date(b.applicationDate) - new Date(a.applicationDate));
+      
+      res.json(allResults);
     } catch (err) {
       console.error('Error fetching recruitment history:', err);
       res.status(500).json({ error: 'Failed to fetch recruitment history', details: err.message });
@@ -96,29 +128,77 @@ module.exports = (pool) => {
   router.get('/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const query = 'SELECT * FROM historique_recrutement WHERE id = $1';
-      const result = await pool.query(query, [id]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ error: 'Recruitment record not found' });
+      
+      // Extraire le préfixe et l'ID réel
+      let realId, tableName;
+      if (id.startsWith('new_')) {
+        realId = id.substring(4); // Enlever 'new_'
+        tableName = 'recrutement_history';
+      } else if (id.startsWith('old_')) {
+        realId = id.substring(4); // Enlever 'old_'
+        tableName = 'historique_recrutement';
+      } else {
+        // Pour la compatibilité avec l'ancien format
+        realId = id;
+        tableName = 'historique_recrutement';
       }
+      
+      let query, result;
+      
+      if (tableName === 'recrutement_history') {
+        query = `
+          SELECT rh.*, e.nom_prenom, e.matricule, e.poste_actuel, e.departement
+          FROM recrutement_history rh
+          LEFT JOIN employees e ON rh.employee_id = e.id
+          WHERE rh.id = $1
+        `;
+        result = await pool.query(query, [realId]);
+        
+        if (result.rows.length === 0) {
+          return res.status(404).json({ error: 'Recruitment record not found' });
+        }
 
-      const row = result.rows[0];
-      const formattedResult = {
-        id: row.id,
-        fullName: combineFullName(row.nom, row.prenom),
-        position: row.poste,
-        department: row.departement,
-        source: row.motif_recrutement,
-        status: row.type_contrat,
-        applicationDate: row.date_recrutement,
-        hiringDate: row.date_recrutement,
-        notes: row.notes,
-        recruiter: row.superieur_hierarchique,
-        cv_path: row.cv_path
-      };
+        const row = result.rows[0];
+        const formattedResult = {
+          id: `new_${row.id}`,
+          fullName: row.nom_prenom || 'Employé supprimé',
+          position: row.poste_recrute || row.poste_actuel || 'Poste inconnu',
+          department: row.departement || 'Département inconnu',
+          source: row.source_recrutement,
+          status: row.type_contrat,
+          applicationDate: row.date_recrutement,
+          hiringDate: row.date_recrutement,
+          notes: row.notes,
+          recruiter: 'Onboarding',
+          cv_path: null
+        };
+        
+        res.json(formattedResult);
+      } else {
+        query = 'SELECT * FROM historique_recrutement WHERE id = $1';
+        result = await pool.query(query, [realId]);
+        
+        if (result.rows.length === 0) {
+          return res.status(404).json({ error: 'Recruitment record not found' });
+        }
 
-      res.json(formattedResult);
+        const row = result.rows[0];
+        const formattedResult = {
+          id: `old_${row.id}`,
+          fullName: combineFullName(row.nom, row.prenom),
+          position: row.poste,
+          department: row.departement,
+          source: row.motif_recrutement,
+          status: row.type_contrat,
+          applicationDate: row.date_recrutement,
+          hiringDate: row.date_recrutement,
+          notes: row.notes,
+          recruiter: row.superieur_hierarchique,
+          cv_path: row.cv_path
+        };
+        
+        res.json(formattedResult);
+      }
     } catch (err) {
       console.error('Error fetching recruitment record:', err);
       res.status(500).json({ error: 'Failed to fetch recruitment record', details: err.message });
@@ -281,21 +361,42 @@ module.exports = (pool) => {
     try {
       const { id } = req.params;
       
-      // D'abord, récupérer le chemin du CV pour le supprimer si nécessaire
-      const getQuery = 'SELECT cv_path FROM historique_recrutement WHERE id = $1';
-      const getResult = await pool.query(getQuery, [id]);
-      
-      if (getResult.rows.length > 0 && getResult.rows[0].cv_path) {
-        const cvPath = path.join(__dirname, '..', getResult.rows[0].cv_path);
-        // Supprimer le fichier CV s'il existe
-        if (fs.existsSync(cvPath)) {
-          fs.unlinkSync(cvPath);
-        }
+      // Extraire le préfixe et l'ID réel
+      let realId, tableName;
+      if (id.startsWith('new_')) {
+        realId = id.substring(4); // Enlever 'new_'
+        tableName = 'recrutement_history';
+      } else if (id.startsWith('old_')) {
+        realId = id.substring(4); // Enlever 'old_'
+        tableName = 'historique_recrutement';
+      } else {
+        // Pour la compatibilité avec l'ancien format
+        realId = id;
+        tableName = 'historique_recrutement';
       }
       
-      // Ensuite, supprimer l'enregistrement
-      const deleteQuery = 'DELETE FROM historique_recrutement WHERE id = $1 RETURNING *';
-      const result = await pool.query(deleteQuery, [id]);
+      let getQuery, deleteQuery, result;
+      
+      if (tableName === 'recrutement_history') {
+        // Pour recrutement_history, pas de CV à supprimer
+        deleteQuery = 'DELETE FROM recrutement_history WHERE id = $1 RETURNING *';
+        result = await pool.query(deleteQuery, [realId]);
+      } else {
+        // Pour historique_recrutement, supprimer le CV si nécessaire
+        getQuery = 'SELECT cv_path FROM historique_recrutement WHERE id = $1';
+        const getResult = await pool.query(getQuery, [realId]);
+        
+        if (getResult.rows.length > 0 && getResult.rows[0].cv_path) {
+          const cvPath = path.join(__dirname, '..', getResult.rows[0].cv_path);
+          // Supprimer le fichier CV s'il existe
+          if (fs.existsSync(cvPath)) {
+            fs.unlinkSync(cvPath);
+          }
+        }
+        
+        deleteQuery = 'DELETE FROM historique_recrutement WHERE id = $1 RETURNING *';
+        result = await pool.query(deleteQuery, [realId]);
+      }
 
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Recruitment record not found' });
@@ -303,11 +404,21 @@ module.exports = (pool) => {
 
       // Formatter la réponse pour le frontend
       const row = result.rows[0];
-      const formattedResult = {
-        id: row.id,
-        fullName: combineFullName(row.nom, row.prenom),
-        message: 'Recruitment record deleted successfully'
-      };
+      let formattedResult;
+      
+      if (tableName === 'recrutement_history') {
+        formattedResult = {
+          id: `new_${row.id}`,
+          fullName: row.nom_prenom || 'Employé supprimé',
+          message: 'Recruitment record deleted successfully'
+        };
+      } else {
+        formattedResult = {
+          id: `old_${row.id}`,
+          fullName: combineFullName(row.nom, row.prenom),
+          message: 'Recruitment record deleted successfully'
+        };
+      }
 
       res.json(formattedResult);
     } catch (err) {

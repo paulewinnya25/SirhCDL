@@ -11,6 +11,8 @@ const LeaveManagement = () => {
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingConge, setEditingConge] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [conges, setConges] = useState([]);
@@ -196,10 +198,36 @@ const LeaveManagement = () => {
       // Préparer les données pour l'API
       const congeData = new FormData();
       
-      // Ajouter les champs de base
+      // Ajouter les champs de base avec conversion des dates
       Object.keys(values).forEach(key => {
         if (values[key] !== null && values[key] !== undefined && values[key] !== '') {
-          congeData.append(key, values[key]);
+          // Exclure les champs calculés qui seront ajoutés séparément
+          if (key === 'jours_pris' || key === 'jours_restants' || key === 'statut' || key === 'date_demande') {
+            return; // Skip these fields
+          }
+          
+          // Convertir les dates en format YYYY-MM-DD
+          if (key.includes('date_')) {
+            let dateValue = values[key];
+            
+            // Si c'est un objet Date, le convertir en string
+            if (dateValue instanceof Date) {
+              dateValue = dateValue.toISOString().split('T')[0];
+            } else if (typeof dateValue === 'string') {
+              // Si c'est une string ISO, la convertir en YYYY-MM-DD
+              if (dateValue.includes('T') || dateValue.includes('Z')) {
+                const date = new Date(dateValue);
+                if (!isNaN(date.getTime())) {
+                  dateValue = date.toISOString().split('T')[0];
+                }
+              }
+              // Si c'est déjà au format YYYY-MM-DD, l'utiliser tel quel
+            }
+            
+            congeData.append(key, dateValue);
+          } else {
+            congeData.append(key, values[key]);
+          }
         }
       });
       
@@ -271,7 +299,90 @@ const LeaveManagement = () => {
     setShowRejectModal(true);
   };
 
-  // Refuser un congé
+  // Ouvrir le modal de modification
+  const openEditModal = async (id) => {
+    try {
+      const conge = await congeService.getById(id);
+      setEditingConge(conge);
+      setShowEditModal(true);
+    } catch (error) {
+      console.error('Erreur lors de la récupération du congé:', error);
+      showNotification('Erreur lors de la récupération du congé', 'error');
+    }
+  };
+
+  // Gérer la soumission de la modification
+  const handleEditSubmit = async (values, { resetForm }) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      // Calculer les jours pris si non fournis
+      const startDate = new Date(values.date_debut);
+      const endDate = new Date(values.date_fin);
+      const diffTime = Math.abs(endDate - startDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      
+      // Préparer les données pour l'API
+      const congeData = new FormData();
+      
+      // Ajouter les champs de base avec conversion des dates
+      Object.keys(values).forEach(key => {
+        if (values[key] !== null && values[key] !== undefined && values[key] !== '') {
+          // Convertir les dates en format YYYY-MM-DD
+          if (key.includes('date_') && values[key] instanceof Date) {
+            congeData.append(key, values[key].toISOString().split('T')[0]);
+          } else if (key.includes('date_') && typeof values[key] === 'string') {
+            // Si c'est déjà une string, s'assurer qu'elle est au bon format
+            const dateValue = new Date(values[key]);
+            if (!isNaN(dateValue.getTime())) {
+              congeData.append(key, dateValue.toISOString().split('T')[0]);
+            } else {
+              congeData.append(key, values[key]);
+            }
+          } else {
+            congeData.append(key, values[key]);
+          }
+        }
+      });
+      
+      // Ajouter les champs calculés
+      congeData.append('jours_pris', diffDays);
+      
+      // Ajouter les jours restants si les jours annuels sont définis
+      if (values.jours_conges_annuels) {
+        congeData.append('jours_restants', values.jours_conges_annuels - diffDays);
+      }
+      
+      // Ajouter le fichier si présent
+      if (selectedFile) {
+        congeData.append('document', selectedFile);
+      }
+      
+      // Envoyer les données à l'API
+      const response = await congeService.update(editingConge.id, congeData);
+      
+      // Mettre à jour la liste des congés
+      setConges(prev => prev.map(conge => 
+        conge.id === editingConge.id ? response : conge
+      ));
+      
+      // Succès
+      showNotification('Congé modifié avec succès!');
+      
+      // Fermer le modal après succès
+      setTimeout(() => {
+        setShowEditModal(false);
+        setEditingConge(null);
+        setSelectedFile(null);
+      }, 1500);
+    } catch (error) {
+      console.error('Erreur lors de la modification du congé:', error);
+      setError('Une erreur est survenue lors de la modification du congé.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   const handleReject = async () => {
     if (!rejectReason.trim()) {
       setError('Veuillez fournir un motif de refus.');
@@ -705,6 +816,13 @@ const LeaveManagement = () => {
                             <i className="fas fa-eye"></i>
                           </button>
                           <button 
+                            onClick={() => openEditModal(conge.id)} 
+                            className="btn btn-warning btn-sm" 
+                            title="Modifier"
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                          <button 
                             onClick={() => confirmDelete(conge.id)} 
                             className="btn btn-danger btn-sm" 
                             title="Supprimer"
@@ -862,21 +980,19 @@ const LeaveManagement = () => {
                             name="date_debut" 
                             className={`form-control ${errors.date_debut && touched.date_debut ? 'is-invalid' : ''}`}
                             onChange={(e) => {
-                              const value = e.target.value;
+                              const value = e.target.value; // Format YYYY-MM-DD
                               setFieldValue('date_debut', value);
                               
                               // Mettre à jour les jours pris et la date de retour si la date de fin est définie
                               if (values.date_fin) {
-                                const startDate = new Date(value);
-                                const endDate = new Date(values.date_fin);
                                 const diffDays = calculateDays(value, values.date_fin);
                                 
                                 setFieldValue('jours_pris', diffDays);
                                 
                                 // Calculer la date de retour (jour après la date de fin)
-                                const returnDate = new Date(endDate);
-                                returnDate.setDate(returnDate.getDate() + 1);
-                                setFieldValue('date_retour', returnDate.toISOString().split('T')[0]);
+                                const endDate = new Date(values.date_fin);
+                                endDate.setDate(endDate.getDate() + 1);
+                                setFieldValue('date_retour', endDate.toISOString().split('T')[0]);
                                 
                                 // Calculer les jours restants si les jours annuels sont définis
                                 if (values.jours_conges_annuels) {
@@ -895,21 +1011,19 @@ const LeaveManagement = () => {
                             name="date_fin" 
                             className={`form-control ${errors.date_fin && touched.date_fin ? 'is-invalid' : ''}`}
                             onChange={(e) => {
-                              const value = e.target.value;
+                              const value = e.target.value; // Format YYYY-MM-DD
                               setFieldValue('date_fin', value);
                               
                               // Mettre à jour les jours pris et la date de retour si la date de début est définie
                               if (values.date_debut) {
-                                const startDate = new Date(values.date_debut);
-                                const endDate = new Date(value);
                                 const diffDays = calculateDays(values.date_debut, value);
                                 
                                 setFieldValue('jours_pris', diffDays);
                                 
                                 // Calculer la date de retour (jour après la date de fin)
-                                const returnDate = new Date(endDate);
-                                returnDate.setDate(returnDate.getDate() + 1);
-                                setFieldValue('date_retour', returnDate.toISOString().split('T')[0]);
+                                const endDate = new Date(value);
+                                endDate.setDate(endDate.getDate() + 1);
+                                setFieldValue('date_retour', endDate.toISOString().split('T')[0]);
                                 
                                 // Calculer les jours restants si les jours annuels sont définis
                                 if (values.jours_conges_annuels) {
@@ -1295,6 +1409,242 @@ const LeaveManagement = () => {
               >
                 <i className="fas fa-times me-2"></i>Confirmer le refus
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de modification de congé */}
+      {showEditModal && editingConge && (
+        <div className="modal-backdrop">
+          <div className="modal-content modal-lg">
+            <div className="modal-header">
+              <h5 className="modal-title">
+                <i className="fas fa-edit me-2 text-warning"></i>
+                Modifier la demande de congé
+              </h5>
+              <button 
+                type="button" 
+                className="btn-close" 
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingConge(null);
+                  setSelectedFile(null);
+                  setError(null);
+                }}
+              ></button>
+            </div>
+            <div className="modal-body">
+              {error && (
+                <div className="alert alert-danger" role="alert">
+                  <i className="fas fa-exclamation-circle me-2"></i>
+                  {error}
+                </div>
+              )}
+              
+              <Formik
+                initialValues={{
+                  nom_employe: editingConge.nom_employe || '',
+                  service: editingConge.service || '',
+                  poste: editingConge.poste || '',
+                  date_embauche: editingConge.date_embauche || '',
+                  jours_conges_annuels: editingConge.jours_conges_annuels || 30,
+                  date_debut: editingConge.date_debut ? editingConge.date_debut.split('T')[0] : '',
+                  date_fin: editingConge.date_fin ? editingConge.date_fin.split('T')[0] : '',
+                  date_retour: editingConge.date_retour ? editingConge.date_retour.split('T')[0] : '',
+                  motif: editingConge.motif || '',
+                  type_conge: editingConge.type_conge || 'Congé payé'
+                }}
+                validationSchema={congeSchema}
+                onSubmit={handleEditSubmit}
+              >
+                {({ values, setFieldValue }) => (
+                  <Form>
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="mb-3">
+                          <label htmlFor="nom_employe" className="form-label">
+                            <i className="fas fa-user me-2 text-primary"></i>
+                            Employé *
+                          </label>
+                          <Field
+                            as="select"
+                            name="nom_employe"
+                            className="form-select"
+                            disabled
+                          >
+                            <option value="">Sélectionner un employé</option>
+                            {employees.map((emp) => (
+                              <option key={emp.id} value={emp.nom_prenom}>
+                                {emp.nom_prenom}
+                              </option>
+                            ))}
+                          </Field>
+                          <ErrorMessage name="nom_employe" component="div" className="text-danger small" />
+                        </div>
+
+                        <div className="mb-3">
+                          <label htmlFor="service" className="form-label">
+                            <i className="fas fa-building me-2 text-primary"></i>
+                            Service *
+                          </label>
+                          <Field
+                            as="select"
+                            name="service"
+                            className="form-select"
+                          >
+                            <option value="">Sélectionner un service</option>
+                            {services.map((service) => (
+                              <option key={service} value={service}>
+                                {service}
+                              </option>
+                            ))}
+                          </Field>
+                          <ErrorMessage name="service" component="div" className="text-danger small" />
+                        </div>
+
+                        <div className="mb-3">
+                          <label htmlFor="type_conge" className="form-label">
+                            <i className="fas fa-calendar-alt me-2 text-primary"></i>
+                            Type de congé *
+                          </label>
+                          <Field
+                            as="select"
+                            name="type_conge"
+                            className="form-select"
+                          >
+                            {leaveTypes.map((type) => (
+                              <option key={type} value={type}>
+                                {type}
+                              </option>
+                            ))}
+                          </Field>
+                          <ErrorMessage name="type_conge" component="div" className="text-danger small" />
+                        </div>
+
+                        <div className="mb-3">
+                          <label htmlFor="date_debut" className="form-label">
+                            <i className="fas fa-calendar me-2 text-primary"></i>
+                            Date de début *
+                          </label>
+                          <Field
+                            type="date"
+                            name="date_debut"
+                            className="form-control"
+                          />
+                          <ErrorMessage name="date_debut" component="div" className="text-danger small" />
+                        </div>
+
+                        <div className="mb-3">
+                          <label htmlFor="date_fin" className="form-label">
+                            <i className="fas fa-calendar me-2 text-primary"></i>
+                            Date de fin *
+                          </label>
+                          <Field
+                            type="date"
+                            name="date_fin"
+                            className="form-control"
+                          />
+                          <ErrorMessage name="date_fin" component="div" className="text-danger small" />
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <div className="mb-3">
+                          <label htmlFor="date_retour" className="form-label">
+                            <i className="fas fa-calendar me-2 text-primary"></i>
+                            Date de retour
+                          </label>
+                          <Field
+                            type="date"
+                            name="date_retour"
+                            className="form-control"
+                          />
+                          <ErrorMessage name="date_retour" component="div" className="text-danger small" />
+                        </div>
+
+                        <div className="mb-3">
+                          <label htmlFor="motif" className="form-label">
+                            <i className="fas fa-comment me-2 text-primary"></i>
+                            Motif
+                          </label>
+                          <Field
+                            as="textarea"
+                            name="motif"
+                            className="form-control"
+                            rows="3"
+                            placeholder="Détails du motif..."
+                          />
+                          <ErrorMessage name="motif" component="div" className="text-danger small" />
+                        </div>
+
+                        <div className="mb-3">
+                          <label htmlFor="jours_conges_annuels" className="form-label">
+                            <i className="fas fa-calendar-check me-2 text-primary"></i>
+                            Jours de congés annuels
+                          </label>
+                          <Field
+                            type="number"
+                            name="jours_conges_annuels"
+                            className="form-control"
+                            min="0"
+                            max="365"
+                          />
+                          <ErrorMessage name="jours_conges_annuels" component="div" className="text-danger small" />
+                        </div>
+
+                        <div className="mb-3">
+                          <label htmlFor="document" className="form-label">
+                            <i className="fas fa-file me-2 text-primary"></i>
+                            Document (optionnel)
+                          </label>
+                          <input
+                            type="file"
+                            className="form-control"
+                            onChange={(e) => setSelectedFile(e.target.files[0])}
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          />
+                          <div className="form-text">
+                            Formats acceptés: PDF, DOC, DOCX, JPG, JPEG, PNG
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="modal-footer">
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        onClick={() => {
+                          setShowEditModal(false);
+                          setEditingConge(null);
+                          setSelectedFile(null);
+                          setError(null);
+                        }}
+                        disabled={isSubmitting}
+                      >
+                        <i className="fas fa-times me-2"></i>Annuler
+                      </button>
+                      <button 
+                        type="submit" 
+                        className="btn btn-warning" 
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Modification en cours...
+                          </>
+                        ) : (
+                          <>
+                            <i className="fas fa-save me-2"></i>Enregistrer les modifications
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </Form>
+                )}
+              </Formik>
             </div>
           </div>
         </div>

@@ -1,7 +1,9 @@
 const express = require('express');
+const AutoNotificationService = require('../services/autoNotificationService');
 
 module.exports = (pool) => {
     const router = express.Router();
+    const autoNotificationService = new AutoNotificationService(pool);
 
     // Récupérer toutes les demandes
     router.get('/', async (req, res) => {
@@ -17,6 +19,25 @@ module.exports = (pool) => {
         } catch (err) {
             console.error('Error fetching employee requests:', err);
             res.status(500).json({ error: 'Failed to fetch employee requests', details: err.message });
+        }
+    });
+
+    // Compter les demandes en attente pour les notifications
+    router.get('/count/pending', async (req, res) => {
+        try {
+            const query = `
+                SELECT COUNT(*) as pending_count
+                FROM employee_requests 
+                WHERE status = 'pending'
+            `;
+            const result = await pool.query(query);
+            res.json({ 
+                pendingCount: parseInt(result.rows[0].pending_count),
+                timestamp: new Date().toISOString()
+            });
+        } catch (err) {
+            console.error('Error counting pending requests:', err);
+            res.status(500).json({ error: 'Failed to count pending requests', details: err.message });
         }
     });
 
@@ -95,6 +116,7 @@ module.exports = (pool) => {
             ];
 
             const result = await pool.query(query, values);
+            const newRequest = result.rows[0];
             
             // Récupérer les informations de l'employé pour la réponse
             const employeeQuery = `SELECT nom_prenom, poste_actuel, entity, email FROM employees WHERE id = $1`;
@@ -102,9 +124,24 @@ module.exports = (pool) => {
             
             // Combiner les résultats
             const response = {
-                ...result.rows[0],
+                ...newRequest,
                 ...(employeeResult.rows[0] || {})
             };
+
+            // Créer des notifications automatiques pour les RH et responsables
+            try {
+                await autoNotificationService.createRequestNotification({
+                    request_id: newRequest.id,
+                    employee_id: employee_id,
+                    request_type: request_type,
+                    title: `${request_type}: ${employeeResult.rows[0]?.nom_prenom || 'Employé'}`,
+                    description: reason || request_details,
+                    priority: request_type === 'leave_request' ? 'high' : 'normal'
+                });
+            } catch (notificationError) {
+                console.error('❌ Erreur lors de la création de notification automatique:', notificationError);
+                // Ne pas faire échouer la création de demande si la notification échoue
+            }
             
             res.status(201).json(response);
         } catch (err) {
@@ -134,6 +171,8 @@ module.exports = (pool) => {
                 return res.status(404).json({ error: 'Employee request not found' });
             }
 
+            const approvedRequest = result.rows[0];
+
             // Récupérer les informations de l'employé pour la réponse
             const employeeQuery = `
                 SELECT e.nom_prenom, e.poste_actuel, e.entity, e.email 
@@ -145,9 +184,24 @@ module.exports = (pool) => {
             
             // Combiner les résultats
             const response = {
-                ...result.rows[0],
+                ...approvedRequest,
                 ...(employeeResult.rows[0] || {})
             };
+
+            // Créer une notification automatique pour l'employé
+            try {
+                await autoNotificationService.createApprovalNotification({
+                    request_id: approvedRequest.id,
+                    employee_id: approvedRequest.employee_id,
+                    approver_id: req.user?.id || null, // Si l'authentification est en place
+                    status: 'approved',
+                    request_type: approvedRequest.request_type,
+                    title: `${approvedRequest.request_type}: ${employeeResult.rows[0]?.nom_prenom || 'Demande'}`
+                });
+            } catch (notificationError) {
+                console.error('❌ Erreur lors de la création de notification d\'approbation:', notificationError);
+                // Ne pas faire échouer l'approbation si la notification échoue
+            }
             
             res.json(response);
         } catch (err) {
@@ -201,6 +255,35 @@ module.exports = (pool) => {
         } catch (err) {
             console.error('Error rejecting employee request:', err);
             res.status(500).json({ error: 'Failed to reject employee request', details: err.message });
+        }
+    });
+
+    // Route pour supprimer toutes les demandes des employés (côté RH)
+    // IMPORTANT: Cette route doit être définie AVANT /:id pour éviter les conflits
+    router.delete('/all', async (req, res) => {
+        try {
+            // Supprimer toutes les demandes
+            const deleteQuery = 'DELETE FROM employee_requests';
+            const result = await pool.query(deleteQuery);
+            
+            // Réinitialiser la séquence pour que les prochains IDs commencent à 1
+            const resetSequenceQuery = 'ALTER SEQUENCE employee_requests_id_seq RESTART WITH 1';
+            await pool.query(resetSequenceQuery);
+            
+            console.log(`✅ Toutes les demandes des employés ont été supprimées (${result.rowCount} lignes)`);
+            
+            res.json({
+                success: true,
+                message: `Toutes les demandes ont été supprimées avec succès (${result.rowCount} lignes supprimées)`,
+                deletedCount: result.rowCount
+            });
+        } catch (err) {
+            console.error('❌ Erreur lors de la suppression des demandes:', err);
+            res.status(500).json({
+                success: false,
+                error: 'Erreur lors de la suppression des demandes',
+                details: err.message
+            });
         }
     });
 
@@ -304,6 +387,7 @@ module.exports = (pool) => {
             res.status(500).json({ error: 'Failed to fetch statistics', details: err.message });
         }
     });
+
 
     return router;
 };

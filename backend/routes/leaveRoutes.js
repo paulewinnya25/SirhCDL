@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
+const AutoNotificationService = require('../services/autoNotificationService');
 
 module.exports = (pool) => {
+    const autoNotificationService = new AutoNotificationService(pool);
   // Get all leave requests
   router.get('/', async (req, res) => {
     try {
@@ -159,8 +161,27 @@ module.exports = (pool) => {
         reason
       ]);
       
+      const newLeaveRequest = result.rows[0];
+
+      // Créer des notifications automatiques pour les RH et responsables
+      try {
+        await autoNotificationService.createRequestNotification({
+          request_id: newLeaveRequest.id,
+          employee_id: employeeId,
+          request_type: 'leave_request',
+          title: `Demande de congé - Employé ID ${employeeId}`,
+          description: `Demande de congé du ${startDate} au ${endDate}. Type: ${leaveType}. Motif: ${reason}`,
+          priority: 'high'
+        });
+        
+        console.log(`📢 Notification automatique créée pour la demande de congé de l'employé ${employeeId}`);
+      } catch (notificationError) {
+        console.error('❌ Erreur lors de la création de notification automatique:', notificationError);
+        // Ne pas faire échouer la création de demande si la notification échoue
+      }
+      
       res.status(201).json({ 
-        id: result.rows[0].id,
+        id: newLeaveRequest.id,
         message: 'Leave request created successfully' 
       });
     } catch (err) {

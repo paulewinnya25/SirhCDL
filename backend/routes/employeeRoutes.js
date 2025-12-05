@@ -191,8 +191,14 @@ const fixEncodingInDatabase = async (pool) => {
 // Configuration de multer pour le stockage des fichiers
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        // Définir le dossier de destination pour les fichiers téléchargés
-        const uploadDir = path.join(__dirname, '../uploads/employee-documents');
+        let uploadDir;
+        
+        // Définir le dossier de destination selon le type de fichier
+        if (file.fieldname === 'photo') {
+            uploadDir = path.join(__dirname, '../uploads/photos');
+        } else {
+            uploadDir = path.join(__dirname, '../uploads/employee-documents');
+        }
         
         // Créer le répertoire s'il n'existe pas
         if (!fs.existsSync(uploadDir)) {
@@ -205,7 +211,12 @@ const storage = multer.diskStorage({
         // Générer un nom de fichier unique pour éviter les collisions
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const ext = path.extname(file.originalname);
-        cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+        
+        if (file.fieldname === 'photo') {
+            cb(null, `employee-photo-${uniqueSuffix}${ext}`);
+        } else {
+            cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+        }
     }
 });
 
@@ -287,6 +298,87 @@ module.exports = (pool) => {
         }
     });
 
+    // Route pour récupérer les documents d'un employé (doit être avant /:id)
+    router.get('/:id/documents', async (req, res) => {
+        try {
+            const { id } = req.params;
+            const query = `
+                SELECT 
+                    id,
+                    employee_id,
+                    document_type,
+                    file_name,
+                    file_path,
+                    upload_date,
+                    CASE 
+                        WHEN file_path LIKE '%.pdf' THEN 'pdf'
+                        WHEN file_path LIKE '%.doc' OR file_path LIKE '%.docx' THEN 'word'
+                        WHEN file_path LIKE '%.xls' OR file_path LIKE '%.xlsx' THEN 'excel'
+                        WHEN file_path LIKE '%.jpg' OR file_path LIKE '%.jpeg' OR file_path LIKE '%.png' THEN 'image'
+                        ELSE 'other'
+                    END as file_type
+                FROM employee_documents 
+                WHERE employee_id = $1 
+                ORDER BY upload_date DESC
+            `;
+            const result = await pool.query(query, [id]);
+            res.json(result.rows);
+        } catch (err) {
+            console.error('Error fetching employee documents:', err);
+            res.status(500).json({ error: 'Failed to fetch employee documents', details: err.message });
+        }
+    });
+
+    // Route pour télécharger un document d'employé (doit être avant /:id)
+    router.get('/documents/:documentId/download', async (req, res) => {
+        try {
+            const { documentId } = req.params;
+            const query = 'SELECT file_path, file_name FROM employee_documents WHERE id = $1';
+            const result = await pool.query(query, [documentId]);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'Document not found' });
+            }
+            
+            const document = result.rows[0];
+            const filePath = path.join(__dirname, '..', document.file_path);
+            
+            if (fs.existsSync(filePath)) {
+                res.download(filePath, document.file_name);
+            } else {
+                res.status(404).json({ error: 'File not found on server' });
+            }
+        } catch (err) {
+            console.error('Error downloading document:', err);
+            res.status(500).json({ error: 'Failed to download document', details: err.message });
+        }
+    });
+
+    // Route pour visualiser un document d'employé (doit être avant /:id)
+    router.get('/documents/:documentId/view', async (req, res) => {
+        try {
+            const { documentId } = req.params;
+            const query = 'SELECT file_path, file_name FROM employee_documents WHERE id = $1';
+            const result = await pool.query(query, [documentId]);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'Document not found' });
+            }
+            
+            const document = result.rows[0];
+            const filePath = path.join(__dirname, '..', document.file_path);
+            
+            if (fs.existsSync(filePath)) {
+                res.sendFile(path.resolve(filePath));
+            } else {
+                res.status(404).json({ error: 'File not found on server' });
+            }
+        } catch (err) {
+            console.error('Error viewing document:', err);
+            res.status(500).json({ error: 'Failed to view document', details: err.message });
+        }
+    });
+
     // Récupérer un employé par ID
     router.get('/:id', async (req, res) => {
         try {
@@ -307,8 +399,11 @@ module.exports = (pool) => {
         }
     });
 
-    // Créer un nouvel employé (avec téléchargement de fichiers)
-    router.post('/', upload.array('documents', 10), async (req, res) => {
+    // Créer un nouvel employé (avec téléchargement de fichiers et photos)
+    router.post('/', upload.fields([
+        { name: 'documents', maxCount: 10 },
+        { name: 'photo', maxCount: 1 }
+    ]), async (req, res) => {
         console.log('⭐ POST /employees - Début de la requête');
         console.log('Body reçu:', req.body);
         
@@ -376,12 +471,29 @@ module.exports = (pool) => {
             
             console.log('⭐ Employé créé avec succès, ID:', newEmployee.id);
             
-            // Traitement des documents
-            if (req.files && req.files.length > 0) {
-                console.log(`⭐ Traitement de ${req.files.length} documents`);
+            // Traitement de la photo
+            if (req.files && req.files.photo && req.files.photo.length > 0) {
+                const photoFile = req.files.photo[0];
+                console.log(`⭐ Photo uploadée: ${photoFile.originalname}`);
                 
-                for (let i = 0; i < req.files.length; i++) {
-                    const file = req.files[i];
+                // Mettre à jour l'employé avec le chemin de la photo
+                const photoPath = `/uploads/photos/${path.basename(photoFile.path)}`;
+                const updatePhotoQuery = `
+                    UPDATE employees 
+                    SET photo_path = $1 
+                    WHERE id = $2
+                `;
+                
+                await client.query(updatePhotoQuery, [photoPath, newEmployee.id]);
+                console.log(`⭐ Photo mise à jour pour l'employé ${newEmployee.id}`);
+            }
+            
+            // Traitement des documents
+            if (req.files && req.files.documents && req.files.documents.length > 0) {
+                console.log(`⭐ Traitement de ${req.files.documents.length} documents`);
+                
+                for (let i = 0; i < req.files.documents.length; i++) {
+                    const file = req.files.documents[i];
                     const documentType = Array.isArray(req.body.document_types) 
                         ? req.body.document_types[i] 
                         : (req.body.document_types || 'Autre');
@@ -865,6 +977,7 @@ router.post('/:id/delete-with-departure', async (req, res) => {
             res.status(500).json({ error: 'Failed to fetch employee emails', details: err.message });
         }
     });
+
 
     // Route pour obtenir des statistiques sur les employés
     router.get('/stats/overview', async (req, res) => {

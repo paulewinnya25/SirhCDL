@@ -71,3 +71,11 @@ async function testDepartsEndpoint() {
 }
 
 testDepartsEndpoint();
+
+
+
+
+
+
+
+

@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS employees (
   id SERIAL PRIMARY KEY,
   statut_dossier VARCHAR(255),
-  matricule VARCHAR(50),
+  matricule VARCHAR(50) UNIQUE NOT NULL,
   nom_prenom VARCHAR(255) NOT NULL,
   genre VARCHAR(10),
   date_naissance DATE,
@@ -71,6 +71,18 @@ CREATE TABLE IF NOT EXISTS employee_documents (
 -- Ajoutez un champ mot de passe à la table employees si ce n'est pas déjà fait
 ALTER TABLE employees 
 ADD COLUMN IF NOT EXISTS password VARCHAR(255);
+
+-- Ajouter la contrainte d'unicité sur matricule si elle n'existe pas déjà
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints 
+    WHERE constraint_name = 'employees_matricule_key' 
+    AND table_name = 'employees'
+  ) THEN
+    ALTER TABLE employees ADD CONSTRAINT employees_matricule_key UNIQUE (matricule);
+  END IF;
+END $$;
 
 -- Optionnellement, définissez des mots de passe temporaires pour les tests
 -- Dans un système réel, vous utiliseriez des mots de passe hachés

@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { serverHealthCheck } from '../../utils/serverHealthCheck';
+import { retryHandler } from '../../utils/retryHandler';
+import { API_CONFIG } from '../../config/apiConfig';
+import ServerDiagnostic from '../common/ServerDiagnostic';
 import './Onboarding.css';
 
 const Onboarding = () => {
@@ -20,7 +24,9 @@ const Onboarding = () => {
       telephone: '',
       email: '',
       cnss_number: '',
-      cnamgs_number: ''
+      cnamgs_number: '',
+      contact_urgence: '',
+      telephone_urgence: ''
     },
     professionalInfo: {
       poste_actuel: '',
@@ -36,7 +42,17 @@ const Onboarding = () => {
       categorie: '',
       responsable: '',
       niveau_etude: '',
-      specialisation: ''
+      specialisation: '',
+      type_remuneration: 'Mensuel',
+      mode_paiement: 'Virement bancaire',
+      periode_essai: '',
+      date_fin_essai: '',
+      lieu_travail: '',
+      horaires_travail: '8h-17h',
+      conditions_particulieres: '',
+      avantages_sociaux: '',
+      date_signature: '',
+      notes: ''
     },
     documents: [],
     checklist: {
@@ -50,6 +66,10 @@ const Onboarding = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [serverStatus, setServerStatus] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const steps = [
     { 
@@ -84,25 +104,28 @@ const Onboarding = () => {
     }
   ];
 
-  // Générer un matricule automatique
+  // Générer un matricule automatique - exécuté une seule fois au montage
   useEffect(() => {
+    const generateMatricule = () => {
+      const year = new Date().getFullYear();
+      const timestamp = Date.now().toString().slice(-4);
+      return `CDL-${year}-${timestamp}`;
+    };
+
+    // Générer le matricule seulement si il n'existe pas déjà
     if (!formData.employeeInfo.matricule) {
-      const generateMatricule = () => {
-        const year = new Date().getFullYear().toString().slice(-2);
-        const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-        return `EMP${year}${random}`;
-      };
+      const newMatricule = generateMatricule();
       setFormData(prev => ({
         ...prev,
         employeeInfo: {
           ...prev.employeeInfo,
-          matricule: generateMatricule()
+          matricule: newMatricule
         }
       }));
     }
-  }, []);
+  }, []); // Dépendances vides = exécuté une seule fois
 
-  const handleInputChange = (section, field, value) => {
+  const handleInputChange = useCallback((section, field, value) => {
     setFormData(prev => ({
       ...prev,
       [section]: {
@@ -110,9 +133,18 @@ const Onboarding = () => {
         [field]: value
       }
     }));
-  };
+    
+    // Effacer l'erreur de validation pour ce champ
+    if (validationErrors[`${section}.${field}`]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`${section}.${field}`];
+        return newErrors;
+      });
+    }
+  }, [validationErrors]);
 
-  const handleChecklistChange = (field, checked) => {
+  const handleChecklistChange = useCallback((field, checked) => {
     setFormData(prev => ({
       ...prev,
       checklist: {
@@ -120,9 +152,9 @@ const Onboarding = () => {
         [field]: checked
       }
     }));
-  };
+  }, []);
 
-  const handleFileUpload = (e) => {
+  const handleFileUpload = useCallback((e) => {
     const files = Array.from(e.target.files);
     setFormData(prev => ({
       ...prev,
@@ -133,74 +165,197 @@ const Onboarding = () => {
         size: file.size
       }))]
     }));
-  };
+  }, []);
 
-  const removeDocument = (index) => {
+  const removeDocument = useCallback((index) => {
     setFormData(prev => ({
       ...prev,
       documents: prev.documents.filter((_, i) => i !== index)
     }));
-  };
+  }, []);
 
-  const validateStep = (step) => {
+  // Validation complète des données - utilisant useCallback pour éviter les re-créations
+  const validateFormData = useCallback(() => {
+    const errors = {};
+    
+    // Validation des informations personnelles
+    if (!formData.employeeInfo.nom_prenom || formData.employeeInfo.nom_prenom.trim().length < 2) {
+      errors['employeeInfo.nom_prenom'] = 'Le nom et prénom sont obligatoires (min 2 caractères)';
+    }
+    
+    if (!formData.employeeInfo.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.employeeInfo.email)) {
+      errors['employeeInfo.email'] = 'L\'email est obligatoire et doit être valide';
+    }
+    
+    if (!formData.employeeInfo.telephone || formData.employeeInfo.telephone.trim().length < 8) {
+      errors['employeeInfo.telephone'] = 'Le numéro de téléphone est obligatoire (min 8 chiffres)';
+    }
+    
+    if (!formData.employeeInfo.date_naissance) {
+      errors['employeeInfo.date_naissance'] = 'La date de naissance est obligatoire';
+    }
+    
+    if (!formData.employeeInfo.lieu_naissance) {
+      errors['employeeInfo.lieu_naissance'] = 'Le lieu de naissance est obligatoire';
+    }
+    
+    // Validation des informations professionnelles
+    if (!formData.professionalInfo.poste_actuel || formData.professionalInfo.poste_actuel.trim().length < 2) {
+      errors['professionalInfo.poste_actuel'] = 'Le poste actuel est obligatoire (min 2 caractères)';
+    }
+    
+    if (!formData.professionalInfo.type_contrat) {
+      errors['professionalInfo.type_contrat'] = 'Le type de contrat est obligatoire';
+    }
+    
+    if (!formData.professionalInfo.date_entree) {
+      errors['professionalInfo.date_entree'] = 'La date d\'entrée est obligatoire';
+    }
+    
+    if (!formData.professionalInfo.entity) {
+      errors['professionalInfo.entity'] = 'L\'entité est obligatoire';
+    }
+    
+    if (!formData.professionalInfo.departement) {
+      errors['professionalInfo.departement'] = 'Le département est obligatoire';
+    }
+    
+    if (!formData.professionalInfo.domaine_fonctionnel) {
+      errors['professionalInfo.domaine_fonctionnel'] = 'Le domaine fonctionnel est obligatoire';
+    }
+    
+    // Validation des documents
+    if (formData.documents.length === 0) {
+      errors['documents'] = 'Au moins un document est requis';
+    }
+    
+    // Validation de la checklist
+    const checklistValues = Object.values(formData.checklist);
+    if (!checklistValues.some(Boolean)) {
+      errors['checklist'] = 'Au moins une étape de la checklist doit être validée';
+    }
+    
+    return errors;
+  }, [formData]);
+
+  const validateStep = useCallback((step) => {
+    const stepErrors = {};
+    
     switch (step) {
       case 1:
-        return formData.employeeInfo.nom_prenom && 
-               formData.employeeInfo.email && 
-               formData.employeeInfo.telephone;
+        if (!formData.employeeInfo.nom_prenom || formData.employeeInfo.nom_prenom.trim().length < 2) {
+          stepErrors['employeeInfo.nom_prenom'] = 'Le nom et prénom sont obligatoires (min 2 caractères)';
+        }
+        if (!formData.employeeInfo.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.employeeInfo.email)) {
+          stepErrors['employeeInfo.email'] = 'L\'email est obligatoire et doit être valide';
+        }
+        if (!formData.employeeInfo.telephone || formData.employeeInfo.telephone.trim().length < 8) {
+          stepErrors['employeeInfo.telephone'] = 'Le numéro de téléphone est obligatoire (min 8 chiffres)';
+        }
+        if (!formData.employeeInfo.date_naissance) {
+          stepErrors['employeeInfo.date_naissance'] = 'La date de naissance est obligatoire';
+        }
+        if (!formData.employeeInfo.lieu_naissance) {
+          stepErrors['employeeInfo.lieu_naissance'] = 'Le lieu de naissance est obligatoire';
+        }
+        break;
       case 2:
-        return formData.professionalInfo.poste_actuel && 
-               formData.professionalInfo.type_contrat && 
-               formData.professionalInfo.date_entree;
+        if (!formData.professionalInfo.poste_actuel || formData.professionalInfo.poste_actuel.trim().length < 2) {
+          stepErrors['professionalInfo.poste_actuel'] = 'Le poste actuel est obligatoire (min 2 caractères)';
+        }
+        if (!formData.professionalInfo.type_contrat) {
+          stepErrors['professionalInfo.type_contrat'] = 'Le type de contrat est obligatoire';
+        }
+        if (!formData.professionalInfo.date_entree) {
+          stepErrors['professionalInfo.date_entree'] = 'La date d\'entrée est obligatoire';
+        }
+        if (!formData.professionalInfo.entity) {
+          stepErrors['professionalInfo.entity'] = 'L\'entité est obligatoire';
+        }
+        if (!formData.professionalInfo.departement) {
+          stepErrors['professionalInfo.departement'] = 'Le département est obligatoire';
+        }
+        if (!formData.professionalInfo.domaine_fonctionnel) {
+          stepErrors['professionalInfo.domaine_fonctionnel'] = 'Le domaine fonctionnel est obligatoire';
+        }
+        break;
       case 3:
-        return formData.documents.length > 0;
+        if (formData.documents.length === 0) {
+          stepErrors['documents'] = 'Au moins un document est requis';
+        }
+        break;
       case 4:
-        return Object.values(formData.checklist).some(Boolean);
+        const checklistValues = Object.values(formData.checklist);
+        if (!checklistValues.some(Boolean)) {
+          stepErrors['checklist'] = 'Au moins une étape de la checklist doit être validée';
+        }
+        break;
       default:
-        return true;
+        break;
     }
-  };
+    
+    return stepErrors;
+  }, [formData]);
 
-  const handleNext = () => {
-    if (validateStep(currentStep) && currentStep < steps.length) {
+  const handleNext = useCallback(() => {
+    const stepErrors = validateStep(currentStep);
+    setValidationErrors(stepErrors);
+    
+    if (Object.keys(stepErrors).length === 0 && currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
     }
-  };
+  }, [currentStep, validateStep, steps.length]);
 
-  const handlePrevious = () => {
+  const handlePrevious = useCallback(() => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      // Effacer les erreurs de l'étape précédente
+      setValidationErrors({});
     }
-  };
+  }, [currentStep]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setRetryCount(0);
+    
+    // Validation finale avant soumission
+    const finalErrors = validateFormData();
+    if (Object.keys(finalErrors).length > 0) {
+      setValidationErrors(finalErrors);
+      setLoading(false);
+      return;
+    }
     
     try {
-      // Créer un FormData pour l'envoi
-      const submitData = new FormData();
+      // Diagnostic du serveur avant soumission
+      console.log('🔍 Vérification de la santé du serveur...');
+      const diagnostic = await serverHealthCheck.runFullDiagnostic();
+      setServerStatus(diagnostic);
       
-      // Ajouter les données de base
-      submitData.append('employeeData', JSON.stringify({
-        ...formData.employeeInfo,
-        ...formData.professionalInfo,
-        checklist: formData.checklist
-      }));
+      if (diagnostic.network.status === 'disconnected') {
+        throw new Error('Aucune connexion réseau détectée. Vérifiez votre connexion internet.');
+      }
       
-      // Ajouter les documents
-      formData.documents.forEach((doc, index) => {
-        submitData.append('documents', doc.file);
-        submitData.append('documentTypes', doc.type);
-      });
-
-      // Appel API (à adapter selon votre backend)
-      const response = await axios.post('/api/employees/onboarding', submitData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
+      if (diagnostic.server.status === 'unhealthy') {
+        throw new Error('Le serveur est temporairement indisponible. Veuillez réessayer plus tard.');
+      }
+      
+      // Si le serveur est accessible mais nécessite une authentification, c'est normal
+      if (diagnostic.server.status === 'healthy' && diagnostic.server.note) {
+        console.log('Serveur accessible:', diagnostic.server.note);
+      }
+      
+      console.log('✅ Serveur prêt, démarrage de l\'onboarding...');
+      
+      // Utiliser le retry handler pour l'onboarding
+      const response = await retryHandler.onboardingWithRetry(
+        formData,
+        (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
         }
-      });
+      );
 
       if (response.data.success) {
         setSuccess(true);
@@ -212,11 +367,41 @@ const Onboarding = () => {
       }
     } catch (err) {
       console.error('Erreur onboarding:', err);
-      setError(err.response?.data?.message || 'Erreur lors de l\'onboarding. Veuillez réessayer.');
+      
+      // Gestion spécifique des erreurs de timeout et retry
+      if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+        setError('⏰ Le serveur prend trop de temps à répondre. Cela peut être dû à la taille des fichiers. Veuillez réessayer ou réduire la taille des documents.');
+      } else if (err.response?.status === 504) {
+        setError('🚨 Erreur de gateway timeout. Le serveur est temporairement indisponible. Veuillez réessayer dans quelques minutes.');
+      } else if (err.message.includes('connexion réseau')) {
+        setError('🌐 Problème de connexion réseau. Vérifiez votre connexion internet et réessayez.');
+      } else if (err.message.includes('serveur est temporairement indisponible')) {
+        setError('🔧 Le serveur est temporairement indisponible. Veuillez réessayer dans quelques minutes.');
+      } else if (err.response?.data?.errors) {
+        const serverErrors = {};
+        err.response.data.errors.forEach(error => {
+          // Mapper les erreurs du serveur aux champs du formulaire
+          if (error.includes('nom_prenom')) serverErrors['employeeInfo.nom_prenom'] = error;
+          else if (error.includes('email')) serverErrors['employeeInfo.email'] = error;
+          else if (error.includes('telephone')) serverErrors['employeeInfo.telephone'] = error;
+          else if (error.includes('poste_actuel')) serverErrors['professionalInfo.poste_actuel'] = error;
+          else if (error.includes('type_contrat')) serverErrors['professionalInfo.type_contrat'] = error;
+          else if (error.includes('date_entree')) serverErrors['professionalInfo.date_entree'] = error;
+          else if (error.includes('entity')) serverErrors['professionalInfo.entity'] = error;
+          else if (error.includes('departement')) serverErrors['professionalInfo.departement'] = error;
+          else if (error.includes('domaine_fonctionnel')) serverErrors['professionalInfo.domaine_fonctionnel'] = error;
+          else if (error.includes('matricule')) serverErrors['employeeInfo.matricule'] = error;
+          else serverErrors['general'] = error;
+        });
+        setValidationErrors(serverErrors);
+      } else {
+        setError(err.response?.data?.message || '❌ Erreur lors de l\'onboarding. Veuillez réessayer.');
+      }
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
-  };
+  }, [formData, validateFormData, navigate]);
 
   const renderStep1 = () => (
     <div className="onboarding-step">
@@ -251,6 +436,9 @@ const Onboarding = () => {
             placeholder="Nom et prénom complet"
             className="form-control"
           />
+          {validationErrors['employeeInfo.nom_prenom'] && (
+            <div className="invalid-feedback">{validationErrors['employeeInfo.nom_prenom']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -289,6 +477,9 @@ const Onboarding = () => {
             required
             className="form-control"
           />
+          {validationErrors['employeeInfo.date_naissance'] && (
+            <div className="invalid-feedback">{validationErrors['employeeInfo.date_naissance']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -301,6 +492,9 @@ const Onboarding = () => {
             placeholder="Ville, pays"
             className="form-control"
           />
+          {validationErrors['employeeInfo.lieu_naissance'] && (
+            <div className="invalid-feedback">{validationErrors['employeeInfo.lieu_naissance']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -369,6 +563,9 @@ const Onboarding = () => {
             placeholder="+241 XX XX XX XX"
             className="form-control"
           />
+          {validationErrors['employeeInfo.telephone'] && (
+            <div className="invalid-feedback">{validationErrors['employeeInfo.telephone']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -382,6 +579,9 @@ const Onboarding = () => {
             placeholder="email@exemple.com"
             className="form-control"
           />
+          {validationErrors['employeeInfo.email'] && (
+            <div className="invalid-feedback">{validationErrors['employeeInfo.email']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -404,6 +604,30 @@ const Onboarding = () => {
             value={formData.employeeInfo.cnamgs_number}
             onChange={(e) => handleInputChange('employeeInfo', 'cnamgs_number', e.target.value)}
             placeholder="Numéro CNAMGS"
+            className="form-control"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="contact_urgence">Contact d'urgence</label>
+          <input
+            type="text"
+            id="contact_urgence"
+            value={formData.employeeInfo.contact_urgence}
+            onChange={(e) => handleInputChange('employeeInfo', 'contact_urgence', e.target.value)}
+            placeholder="Nom et prénom du contact"
+            className="form-control"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="telephone_urgence">Téléphone d'urgence</label>
+          <input
+            type="tel"
+            id="telephone_urgence"
+            value={formData.employeeInfo.telephone_urgence}
+            onChange={(e) => handleInputChange('employeeInfo', 'telephone_urgence', e.target.value)}
+            placeholder="+241 XX XX XX XX"
             className="form-control"
           />
         </div>
@@ -430,6 +654,9 @@ const Onboarding = () => {
             placeholder="Intitulé du poste"
             className="form-control"
           />
+          {validationErrors['professionalInfo.poste_actuel'] && (
+            <div className="invalid-feedback">{validationErrors['professionalInfo.poste_actuel']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -451,6 +678,9 @@ const Onboarding = () => {
             <option value="RH">Ressources Humaines</option>
             <option value="Autre">Autre</option>
           </select>
+          {validationErrors['professionalInfo.domaine_fonctionnel'] && (
+            <div className="invalid-feedback">{validationErrors['professionalInfo.domaine_fonctionnel']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -467,6 +697,9 @@ const Onboarding = () => {
             <option value="Centre Wellness">Centre Wellness</option>
             <option value="Café Walhya">Café Walhya</option>
           </select>
+          {validationErrors['professionalInfo.entity'] && (
+            <div className="invalid-feedback">{validationErrors['professionalInfo.entity']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -479,6 +712,9 @@ const Onboarding = () => {
             placeholder="Ex: IT, RH, Finance"
             className="form-control"
           />
+          {validationErrors['professionalInfo.departement'] && (
+            <div className="invalid-feedback">{validationErrors['professionalInfo.departement']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -497,6 +733,9 @@ const Onboarding = () => {
             <option value="Stage">Stage</option>
             <option value="Freelance">Freelance</option>
           </select>
+          {validationErrors['professionalInfo.type_contrat'] && (
+            <div className="invalid-feedback">{validationErrors['professionalInfo.type_contrat']}</div>
+          )}
         </div>
 
         <div className="form-group">
@@ -509,6 +748,9 @@ const Onboarding = () => {
             required
             className="form-control"
           />
+          {validationErrors['professionalInfo.date_entree'] && (
+            <div className="invalid-feedback">{validationErrors['professionalInfo.date_entree']}</div>
+          )}
         </div>
 
         {formData.professionalInfo.type_contrat !== 'CDI' && (
@@ -624,6 +866,134 @@ const Onboarding = () => {
             <option value="Recommandation">Recommandation</option>
             <option value="Autre">Autre</option>
           </select>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="type_remuneration">Type de rémunération</label>
+          <select
+            id="type_remuneration"
+            value={formData.professionalInfo.type_remuneration}
+            onChange={(e) => handleInputChange('professionalInfo', 'type_remuneration', e.target.value)}
+            className="form-control"
+          >
+            <option value="Mensuel">Mensuel</option>
+            <option value="Horaire">Horaire</option>
+            <option value="Journalier">Journalier</option>
+            <option value="Forfaitaire">Forfaitaire</option>
+            <option value="Commission">Commission</option>
+            <option value="Mixte">Mixte</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="mode_paiement">Mode de paiement</label>
+          <select
+            id="mode_paiement"
+            value={formData.professionalInfo.mode_paiement}
+            onChange={(e) => handleInputChange('professionalInfo', 'mode_paiement', e.target.value)}
+            className="form-control"
+          >
+            <option value="Virement bancaire">Virement bancaire</option>
+            <option value="Chèque">Chèque</option>
+            <option value="Espèces">Espèces</option>
+            <option value="Mobile Money">Mobile Money</option>
+            <option value="Autre">Autre</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="periode_essai">Période d'essai (jours)</label>
+          <input
+            type="number"
+            id="periode_essai"
+            value={formData.professionalInfo.periode_essai}
+            onChange={(e) => handleInputChange('professionalInfo', 'periode_essai', e.target.value)}
+            placeholder="Ex: 90"
+            min="0"
+            className="form-control"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="date_fin_essai">Date de fin de période d'essai</label>
+          <input
+            type="date"
+            id="date_fin_essai"
+            value={formData.professionalInfo.date_fin_essai}
+            onChange={(e) => handleInputChange('professionalInfo', 'date_fin_essai', e.target.value)}
+            className="form-control"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="lieu_travail">Lieu de travail</label>
+          <input
+            type="text"
+            id="lieu_travail"
+            value={formData.professionalInfo.lieu_travail}
+            onChange={(e) => handleInputChange('professionalInfo', 'lieu_travail', e.target.value)}
+            placeholder="Ex: CDL Libreville"
+            className="form-control"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="horaires_travail">Horaires de travail</label>
+          <input
+            type="text"
+            id="horaires_travail"
+            value={formData.professionalInfo.horaires_travail}
+            onChange={(e) => handleInputChange('professionalInfo', 'horaires_travail', e.target.value)}
+            placeholder="Ex: 8h-17h"
+            className="form-control"
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="date_signature">Date de signature du contrat</label>
+          <input
+            type="date"
+            id="date_signature"
+            value={formData.professionalInfo.date_signature}
+            onChange={(e) => handleInputChange('professionalInfo', 'date_signature', e.target.value)}
+            className="form-control"
+          />
+        </div>
+
+        <div className="form-group full-width">
+          <label htmlFor="conditions_particulieres">Conditions particulières</label>
+          <textarea
+            id="conditions_particulieres"
+            value={formData.professionalInfo.conditions_particulieres}
+            onChange={(e) => handleInputChange('professionalInfo', 'conditions_particulieres', e.target.value)}
+            placeholder="Conditions particulières du contrat..."
+            rows="3"
+            className="form-control"
+          />
+        </div>
+
+        <div className="form-group full-width">
+          <label htmlFor="avantages_sociaux">Avantages sociaux</label>
+          <textarea
+            id="avantages_sociaux"
+            value={formData.professionalInfo.avantages_sociaux}
+            onChange={(e) => handleInputChange('professionalInfo', 'avantages_sociaux', e.target.value)}
+            placeholder="Avantages sociaux inclus..."
+            rows="3"
+            className="form-control"
+          />
+        </div>
+
+        <div className="form-group full-width">
+          <label htmlFor="notes">Notes additionnelles</label>
+          <textarea
+            id="notes"
+            value={formData.professionalInfo.notes}
+            onChange={(e) => handleInputChange('professionalInfo', 'notes', e.target.value)}
+            placeholder="Notes additionnelles sur le contrat..."
+            rows="3"
+            className="form-control"
+          />
         </div>
       </div>
     </div>
@@ -783,6 +1153,8 @@ const Onboarding = () => {
               <p><strong>Nom:</strong> {formData.employeeInfo.nom_prenom}</p>
               <p><strong>Email:</strong> {formData.employeeInfo.email}</p>
               <p><strong>Téléphone:</strong> {formData.employeeInfo.telephone}</p>
+              <p><strong>Contact d'urgence:</strong> {formData.employeeInfo.contact_urgence || 'Non renseigné'}</p>
+              <p><strong>Téléphone d'urgence:</strong> {formData.employeeInfo.telephone_urgence || 'Non renseigné'}</p>
             </div>
           </div>
 
@@ -793,6 +1165,12 @@ const Onboarding = () => {
               <p><strong>Type de contrat:</strong> {formData.professionalInfo.type_contrat}</p>
               <p><strong>Date d'entrée:</strong> {formData.professionalInfo.date_entree}</p>
               <p><strong>Entité:</strong> {formData.professionalInfo.entity}</p>
+              <p><strong>Département:</strong> {formData.professionalInfo.departement}</p>
+              <p><strong>Type de rémunération:</strong> {formData.professionalInfo.type_remuneration}</p>
+              <p><strong>Mode de paiement:</strong> {formData.professionalInfo.mode_paiement}</p>
+              <p><strong>Lieu de travail:</strong> {formData.professionalInfo.lieu_travail || 'Non renseigné'}</p>
+              <p><strong>Horaires:</strong> {formData.professionalInfo.horaires_travail}</p>
+              <p><strong>Période d'essai:</strong> {formData.professionalInfo.periode_essai ? `${formData.professionalInfo.periode_essai} jours` : 'Non renseignée'}</p>
             </div>
           </div>
 
@@ -886,6 +1264,28 @@ const Onboarding = () => {
           <i className="fas fa-exclamation-triangle"></i>
           {error}
         </div>
+      )}
+
+      {loading && uploadProgress > 0 && (
+        <div className="progress-container">
+          <div className="progress-bar">
+            <div 
+              className="progress-fill" 
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+          <p className="progress-text">Envoi en cours... {uploadProgress}%</p>
+        </div>
+      )}
+
+      {serverStatus && (
+        <ServerDiagnostic 
+          diagnostic={serverStatus}
+          onRetry={async () => {
+            const newDiagnostic = await serverHealthCheck.runFullDiagnostic();
+            setServerStatus(newDiagnostic);
+          }}
+        />
       )}
 
       <div className="onboarding-progress">

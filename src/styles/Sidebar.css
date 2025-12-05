@@ -120,7 +120,9 @@
   }
   
   .sub-menu-link {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 8px 5px;
     color: rgba(255,255,255,0.7);
     text-decoration: none;
@@ -134,6 +136,46 @@
   .sub-menu-link:hover,
   .sub-menu-link.active {
     color: var(--success);
+  }
+  
+  .sub-menu-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* Notification Badge */
+  .notification-badge {
+    background-color: #ff4757;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  
+  /* Hide notification badge when sidebar is collapsed */
+  .sidebar.collapsed .notification-badge {
+    display: none;
   }
   
   /* Mobile responsiveness */

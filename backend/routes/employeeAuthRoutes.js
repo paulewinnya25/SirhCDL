@@ -39,10 +39,36 @@ module.exports = (pool) => {
       const employee = employeeResult.rows[0];
       console.log('👤 Employé trouvé:', employee.nom_prenom, 'avec le matricule:', matricule);
 
-      // Vérifier le mot de passe
-      // Note: Dans un système de production, utilisez bcrypt.compare
-      // Pour l'instant, on compare directement (à améliorer plus tard)
-      if (employee.password !== password) {
+      // Vérifier le mot de passe avec support pour migration progressive
+      // Supporte à la fois les mots de passe en clair (legacy) et hashés (nouveau)
+      let isPasswordValid = false;
+      
+      // Vérifier si le mot de passe est hashé (commence par $2a$, $2b$, ou $2y$)
+      if (employee.password && employee.password.startsWith('$2')) {
+        // Mot de passe hashé avec bcrypt
+        isPasswordValid = await bcrypt.compare(password, employee.password);
+      } else {
+        // Mot de passe en clair (legacy) - migration progressive
+        isPasswordValid = employee.password === password;
+        
+        // Si la connexion réussit avec un mot de passe en clair, le hasher automatiquement
+        if (isPasswordValid) {
+          try {
+            const saltRounds = 10;
+            const hashedPassword = await bcrypt.hash(password, saltRounds);
+            await pool.query(
+              'UPDATE employees SET password = $1 WHERE id = $2',
+              [hashedPassword, employee.id]
+            );
+            console.log('✅ Mot de passe migré vers bcrypt pour le matricule:', matricule);
+          } catch (hashError) {
+            console.error('⚠️ Erreur lors de la migration du mot de passe:', hashError);
+            // Continuer quand même la connexion
+          }
+        }
+      }
+
+      if (!isPasswordValid) {
         console.log('❌ Mot de passe incorrect pour le matricule:', matricule);
         return res.status(401).json({ 
           success: false, 
@@ -108,9 +134,17 @@ module.exports = (pool) => {
 
       const employee = employeeResult.rows[0];
 
-      // Vérifier l'ancien mot de passe
-      // Note: Dans un système réel, utilisez bcrypt.compare
-      const currentPasswordMatch = currentPassword === employee.password;
+      // Vérifier l'ancien mot de passe avec support pour migration progressive
+      let currentPasswordMatch = false;
+      
+      // Vérifier si le mot de passe est hashé
+      if (employee.password && employee.password.startsWith('$2')) {
+        // Mot de passe hashé avec bcrypt
+        currentPasswordMatch = await bcrypt.compare(currentPassword, employee.password);
+      } else {
+        // Mot de passe en clair (legacy)
+        currentPasswordMatch = currentPassword === employee.password;
+      }
 
       if (!currentPasswordMatch) {
         return res.status(401).json({
